@@ -16,7 +16,7 @@ datasource db {
 }
 
 model Request {
-  id             String   @id @default(uuid())
+  id             String   @id
   team           String?  
   repository     String?
   resourceGroup  String?
@@ -27,20 +27,20 @@ model Request {
   userName       String?
   description    String?
 
-  // Embedded Resources object as a separate model (1-1 relation)
   resources      Resources? @relation(fields: [resourcesId], references: [id])
   resourcesId    String?    @unique
-  date      DateTime @default(now())
+  date           DateTime   @default(now())
 }
 
 model Resources {
-  id    String @id @default(uuid())
-  VM    Int
-  DB    Int
-  ST    Int
+  id      String   @id @default(uuid())
+  VM      Int
+  DB      Int
+  ST      Int
 
   request Request?
 }
+
 
 model User {
   id        String   @id @default(uuid())
