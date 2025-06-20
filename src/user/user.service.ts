@@ -11,4 +11,8 @@ export class UserService {
       data: user,
     });
   }
+
+  async findAllUsers() {
+    return await this.databaseService.user.findMany();
+  }
 }
