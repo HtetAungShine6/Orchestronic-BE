@@ -9,16 +9,24 @@ import {
   Query,
 } from '@nestjs/common';
 import { RequestService } from './request.service';
-
-import { Prisma } from '@prisma/client';
+import { createRequestDto } from './dto/create-request.dto';
+import { Prisma, Status } from '@prisma/client';
+import { ApiBody, ApiQuery } from '@nestjs/swagger';
+import { successResponse } from 'src/common/response.util';
 
 @Controller('request')
 export class RequestController {
   constructor(private readonly requestService: RequestService) {}
 
   @Get()
-  findAll(@Query('status') status?: 'Pending' | 'Approved' | 'Rejected') {
-    return this.requestService.findAll(status);
+  findAll() {
+    return this.requestService.findAll();
+  }
+
+  @Get('status')
+  @ApiQuery({ name: 'status', enum: Status })
+  findByStatus(@Query('status') status: Status) {
+    return this.requestService.findByStatus(status);
   }
 
   @Get(':id')
@@ -27,8 +35,10 @@ export class RequestController {
   }
 
   @Post()
-  createRequest(@Body() request: Prisma.RequestCreateInput) {
-    return this.requestService.createRequest(request);
+  @ApiBody({ type: createRequestDto })
+  createRequest(@Body() request: createRequestDto) {
+    const newRequest = this.requestService.createRequest(request);
+    return successResponse('Request created successfully', newRequest);
   }
 
   @Patch(':id')
