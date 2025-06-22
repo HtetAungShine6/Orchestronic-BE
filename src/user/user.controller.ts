@@ -2,7 +2,7 @@ import { Controller, Post, Body, Get, Query } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { UserService } from './user.service';
 import { UserDto } from './dto/create-user.dto';
-import { ApiResponseWrapper } from 'src/common/decorators/api-response-wrapper.decorator';
+import { ApiResponseWrapper } from '../common/decorators/api-response-wrapper.decorator';
 
 @Controller('user')
 export class UserController {
