@@ -8,11 +8,23 @@ export class UserService {
 
   async createUser(user: Prisma.UserCreateInput) {
     return await this.databaseService.user.create({
-      data: user,
+      data: {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   }
 
   async findAllUsers() {
     return await this.databaseService.user.findMany();
+  }
+
+  async findByEmail(email: string) {
+    return await this.databaseService.user.findFirst({
+      where: {
+        email: email,
+      },
+    });
   }
 }

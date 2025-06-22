@@ -4,7 +4,6 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,37 +15,60 @@ datasource db {
 }
 
 model Request {
-  id             String   @id
-  team           String?  
-  repository     String?
-  resourceGroup  String?
-  region         String?
-  cloudProvider  String?
-  status         Status?  @default(Pending)
-  userId         String?
-  userName       String?
-  description    String?
+  id String @id
 
-  resources      Resources? @relation(fields: [resourcesId], references: [id])
-  resourcesId    String?    @unique
-  date           DateTime   @default(now())
+  repositoryName String // user input: just text
+  repository     Repository? @relation(fields: [repositoryId], references: [id])
+  repositoryId   String? // only set when status = Approved  
+
+  resourceGroup String
+  region        String
+  cloudProvider String
+  status        Status @default(Pending)
+  user          User   @relation(fields: [userId], references: [id])
+  description   String
+
+  resources   Resources @relation(fields: [resourcesId], references: [id])
+  resourcesId String    @unique
+  date        DateTime  @default(now())
+  userId      String
+}
+
+model Repository {
+  id          String      @id @default(cuid())
+  name        String
+  description String
+  developers  User[]      @relation("UserRepositories")
+  Resources   Resources[]
+  Request     Request[]
+}
+
+model ResourceConfig {
+  id        String      @id @default(uuid())
+  VM        Int
+  DB        Int
+  ST        Int
+  Resources Resources[]
 }
 
 model Resources {
-  id      String   @id @default(uuid())
-  VM      Int
-  DB      Int
-  ST      Int
+  id         String         @id @default(uuid())
+  name       String
+  config     ResourceConfig @relation(fields: [configId], references: [id])
+  repository Repository     @relation(fields: [repositoryId], references: [id])
 
-  request Request?
+  request      Request?
+  configId     String
+  repositoryId String
 }
 
-
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  role      Role
+  id           String       @id @default(uuid())
+  name         String
+  email        String       @unique
+  role         Role
+  repositories Repository[] @relation("UserRepositories")
+  Request      Request[]
 }
 
 enum Status {

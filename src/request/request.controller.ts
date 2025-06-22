@@ -12,7 +12,6 @@ import { RequestService } from './request.service';
 import { createRequestDto } from './dto/create-request.dto';
 import { Prisma, Status } from '@prisma/client';
 import { ApiBody, ApiQuery } from '@nestjs/swagger';
-import { successResponse } from 'src/common/response.util';
 
 @Controller('request')
 export class RequestController {
@@ -34,12 +33,12 @@ export class RequestController {
     return this.requestService.findById(+id);
   }
 
-  @Post()
-  @ApiBody({ type: createRequestDto })
-  createRequest(@Body() request: createRequestDto) {
-    const newRequest = this.requestService.createRequest(request);
-    return successResponse('Request created successfully', newRequest);
-  }
+  // @Post()
+  // @ApiBody({ type: createRequestDto })
+  // createRequest(@Body() request: createRequestDto) {
+  //   const newRequest = this.requestService.createRequest(request);
+  //   return successResponse('Request created successfully', newRequest);
+  // }
 
   @Patch(':id')
   updateRequestInfo(
