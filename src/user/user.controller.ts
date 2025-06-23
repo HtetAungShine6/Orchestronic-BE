@@ -1,32 +1,70 @@
-import { Controller, Post, Body, Get, Query } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Query,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { UserService } from './user.service';
-import { UserDto } from './dto/create-user.dto';
-import { ApiResponseWrapper } from '../common/decorators/api-response-wrapper.decorator';
+import { FindUserByEmailDto } from './dto/find-user-by-email.dto';
+import { UserResponseDto } from './dto/user-response.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { ApiOperation } from '@nestjs/swagger';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
-  @ApiResponseWrapper(UserDto)
-  findAllUsers() {
-    return this.userService.findAllUsers();
+  @ApiOperation({
+    summary: 'Find all users',
+  })
+  async findAllUsers(): Promise<UserResponseDto[]> {
+    const users = await this.userService.findAllUsers();
+
+    if (!users || users.length === 0) {
+      throw new NotFoundException('User not found');
+    }
+
+    return users;
   }
 
   @Post()
-  createUser(@Body() user: Prisma.UserCreateInput) {
-    return this.userService.createUser(user);
+  @ApiOperation({
+    summary: 'Create user',
+  })
+  async createUser(@Body() userDto: CreateUserDto): Promise<UserResponseDto> {
+    try {
+      return await this.userService.createUser(userDto);
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Email already exists');
+      }
+      throw error;
+    }
   }
 
   @Get('by-email')
-  async findByEmail(@Query('email') email: string) {
-    const user = await this.userService.findByEmail(email);
+  @ApiOperation({
+    summary: 'Find users by email',
+  })
+  async findByEmail(
+    @Query() query: FindUserByEmailDto,
+  ): Promise<UserResponseDto[]> {
+    const { email } = query;
 
-    if (!user) {
-      return null;
+    const users = await this.userService.findByEmail(email);
+
+    if (!users || users.length === 0) {
+      throw new NotFoundException('USER_NOT_FOUND');
     }
 
-    return user;
+    return users;
   }
 }

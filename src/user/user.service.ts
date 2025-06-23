@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class UserService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async createUser(user: Prisma.UserCreateInput) {
+  async createUser(user: CreateUserDto) {
     return await this.databaseService.user.create({
       data: {
         name: user.name,
@@ -21,10 +21,14 @@ export class UserService {
   }
 
   async findByEmail(email: string) {
-    return await this.databaseService.user.findFirst({
+    return await this.databaseService.user.findMany({
       where: {
-        email: email,
+        email: {
+          contains: email,
+          mode: 'insensitive',
+        },
       },
+      take: 5,
     });
   }
 }
