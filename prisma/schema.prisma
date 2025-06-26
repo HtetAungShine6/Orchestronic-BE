@@ -38,7 +38,7 @@ model Repository {
   id          String      @id @default(cuid())
   name        String      @unique
   description String
-  developers  User[]      @relation("UserRepositories")
+  developers  UserRepository[] 
   Resources   Resources[]
   Request     Request[]
 }
@@ -67,8 +67,17 @@ model User {
   name         String
   email        String       @unique
   role         Role
-  repositories Repository[] @relation("UserRepositories")
+  repositories UserRepository[]
   Request      Request[]
+}
+
+model UserRepository {
+  userId       String
+  repositoryId String
+  user         User       @relation(fields: [userId], references: [id])
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+
+  @@id([userId, repositoryId])
 }
 
 enum Status {
