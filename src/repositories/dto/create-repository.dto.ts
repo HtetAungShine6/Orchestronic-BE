@@ -26,5 +26,5 @@ export class CreateRepositoriesDto {
       'List of collaborator Email to be associated with the repository',
     example: ['u6512345@au.edu, u6512190@au.edu'],
   })
-  collaborators: String[];
+  collaborators: string[];
 }

@@ -24,8 +24,25 @@ export class RepositoriesService {
   async createRepository(repository: CreateRepositoriesDto) {
     const existingRepository = await this.findByName(repository.name);
     if (existingRepository.exists) {
+      return { message: 'Repository already exists' };
+    }
+
+    const collaborators = await this.databaseService.user.findMany({
+      where: {
+        email: { in: repository.collaborators },
+      },
+      select: { email: true },
+    });
+
+    const validEmails = collaborators.map((user) => user.email);
+
+    if (validEmails.length !== repository.collaborators.length) {
+      const missing = repository.collaborators.filter(
+        (email) => !validEmails.includes(email),
+      );
       return {
-        message: 'Repository already exists',
+        message: 'Some collaborators not found',
+        missing,
       };
     }
 
@@ -34,7 +51,7 @@ export class RepositoriesService {
         name: repository.name,
         description: repository.description || '',
         developers: {
-          connect: repository.collaborators.map((email: string) => ({ email })),
+          connect: validEmails.map((email) => ({ email })),
         },
       },
     });
