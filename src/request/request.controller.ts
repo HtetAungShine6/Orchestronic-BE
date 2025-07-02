@@ -9,9 +9,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { RequestService } from './request.service';
-import { createRequestDto } from './dto/create-request.dto';
 import { Prisma, Status } from '@prisma/client';
 import { ApiBody, ApiQuery } from '@nestjs/swagger';
+import { CreateRequestDto } from './dto/create-request.dto';
 
 @Controller('request')
 export class RequestController {
@@ -33,12 +33,11 @@ export class RequestController {
     return this.requestService.findById(+id);
   }
 
-  // @Post()
-  // @ApiBody({ type: createRequestDto })
-  // createRequest(@Body() request: createRequestDto) {
-  //   const newRequest = this.requestService.createRequest(request);
-  //   return successResponse('Request created successfully', newRequest);
-  // }
+  @Post()
+  @ApiBody({ type: CreateRequestDto })
+  createRequest(@Body() request: CreateRequestDto) {
+    return this.requestService.createRequest(request);
+  }
 
   @Patch(':id')
   updateRequestInfo(

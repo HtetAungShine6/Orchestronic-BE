@@ -1,5 +1,7 @@
 // prisma/seed.ts
+import { faker } from '@faker-js/faker/.';
 import { PrismaClient } from '@prisma/client';
+import { generateRepoName } from 'src/lib/utils';
 
 const prisma = new PrismaClient();
 

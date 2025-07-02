@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Status } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
+import { CreateRequestDto } from './dto/create-request.dto';
+import { ApiBody } from '@nestjs/swagger';
+import { CreateRepositoryDto } from './dto/create-repository.dto';
+import { connect } from 'http2';
 
 @Injectable()
 export class RequestService {
@@ -27,50 +31,81 @@ export class RequestService {
     });
   }
 
-  /*
-Prisma needs to know what action to perform on this relation.
+  @ApiBody({ type: CreateRequestDto })
+  async createRequest(dto: CreateRequestDto) {
+    const { repository, resources, ...request } = dto;
 
-"create" tells Prisma: "When creating this Request, also create a new Resources record with the following data."
-so that's why sent data this format:
+    const resourceConfig = await this.databaseService.resourceConfig.create({
+      data: {
+        vms: {
+          create: resources.resourceConfig.vms?.map((vm) => ({
+            name: vm.name,
+            numberOfCores: vm.numberOfCores,
+            memory: vm.memory,
+            os: vm.os,
+          })),
+        },
+        dbs: {
+          create: resources.resourceConfig.dbs?.map((db) => ({
+            engine: db.engine,
+            storageGB: db.storageGB,
+          })),
+        },
+        sts: {
+          create: resources.resourceConfig.sts?.map((st) => ({
+            type: st.type,
+            capacityGB: st.capacityGB,
+          })),
+        },
+      },
+    });
 
-"resources": {
-  "create": {
-    "VM": 2,
-    "DB": 1,
-    "ST": 3
+    const newResource = await this.databaseService.resources.create({
+      data: {
+        name: resources.name,
+        cloudProvider: resources.cloudProvider,
+        region: resources.region,
+        resourceConfig: {
+          connect: {
+            id: resourceConfig.id,
+          },
+        },
+      },
+    });
+
+    const newRepository = await this.databaseService.repository.create({
+      data: {
+        name: repository.name,
+        description: repository.description,
+        resources: {
+          connect: {
+            id: newResource.id,
+          },
+        },
+      },
+    });
+
+    const newRequest = await this.databaseService.request.create({
+      data: {
+        description: request.description,
+        owner: {
+          connect: {
+            id: request.ownerId,
+          },
+        },
+        repository: {
+          connect: {
+            id: newRepository.id,
+          },
+        },
+        resources: {
+          connect: {
+            id: newResource.id,
+          },
+        },
+      },
+    });
   }
-}
-
-*/
-
-  // @ApiBody({ type: createRequestDto })
-  // async createRequest(request: createRequestDto) {
-  //   const lastRequest = await this.databaseService.request.findFirst({
-  //     where: { id: { startsWith: 'R-' } },
-  //     orderBy: {
-  //       date: 'desc',
-  //     },
-  //   });
-
-  //   let newId: string;
-
-  //   if (lastRequest?.id) {
-  //     const lastNumber = parseInt(lastRequest.id.replace('R-', '')) || 0;
-  //     newId = `R-${lastNumber + 1}`;
-  //   } else {
-  //     newId = 'R-1';
-  //   }
-
-  //   return this.databaseService.request.create({
-  //     data: {
-  //       id: newId,
-  //       ...request,
-  //       resources: {
-  //         create: request.resources,
-  //       },
-  //     },
-  //   });
-  // }
 
   async updateRequestInfo(id: number, updateData: Prisma.RequestUpdateInput) {
     return this.databaseService.request.update({
