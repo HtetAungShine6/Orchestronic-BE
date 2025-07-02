@@ -15,12 +15,14 @@ datasource db {
 }
 
 model Request {
-  id String @id
+  id          String @id @default(uuid())
+  status      Status @default(Pending)
+  description String
 
-  repositoryName String // user input: just text
-  repository     Repository? @relation(fields: [repositoryId], references: [id])
-  repositoryId   String? // only set when status = Approved  
+  owner   User   @relation(fields: [ownerId], references: [id])
+  ownerId String @unique
 
+<<<<<<< HEAD
   resourceGroup String
   region        String
   cloudProvider String
@@ -41,33 +43,109 @@ model Repository {
   Resources   Resources[]
   Request     Request[]
 }
+=======
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId String     @unique
 
-model ResourceConfig {
-  id        String      @id @default(uuid())
-  VM        Int
-  DB        Int
-  ST        Int
-  Resources Resources[]
+  resources   Resources @relation(fields: [resourcesId], references: [id])
+  resourcesId String    @unique
+}
+
+model Repository {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+>>>>>>> ea45375888ecfd9d9bbc8abd088d7c8852b9b2b7
+
+  request Request?
+
+  resources   Resources @relation(fields: [resourcesId], references: [id])
+  resourcesId String    @unique
+
+  collaborators User[]           @relation("RepositoryCollaborators")
+  status        RepositoryStatus @default(Pending)
 }
 
 model Resources {
-  id         String         @id @default(uuid())
-  name       String
-  config     ResourceConfig @relation(fields: [configId], references: [id])
-  repository Repository     @relation(fields: [repositoryId], references: [id])
+  id String @id @default(uuid())
 
-  request      Request?
-  configId     String
-  repositoryId String
+  name          String
+  cloudProvider String
+  region        String
+
+  repository Repository?
+
+  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id])
+  resourceConfigId String         @unique
+
+  request Request?
+}
+
+model ResourceConfig {
+  id String @id @default(uuid())
+
+  vms VMInstance[]
+  dbs DatabaseInstance[]
+  sts StorageInstance[]
+
+  resources Resources?
+}
+
+model VMInstance {
+  id String @id @default(uuid())
+
+  name          String
+  numberOfCores Int
+  memory        Int
+  os            String
+
+  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id])
+  resourceConfigId String
+}
+
+model DatabaseInstance {
+  id String @id @default(uuid())
+
+  engine    String
+  storageGB Int
+
+  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id])
+  resourceConfigId String
+}
+
+model StorageInstance {
+  id String @id @default(uuid())
+
+  type       String
+  capacityGB Int
+
+  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id])
+  resourceConfigId String
 }
 
 model User {
+<<<<<<< HEAD
   id           String       @id @default(uuid())
   name         String
   email        String       @unique
   role         Role
   repositories UserRepository[]
   Request      Request[]
+=======
+  id    String @id @default(uuid())
+  name  String
+  email String @unique
+  role  Role
+
+  collaboratedRepos Repository[] @relation("RepositoryCollaborators")
+
+  request Request?
+}
+
+enum RepositoryStatus {
+  Created
+  Pending
+>>>>>>> ea45375888ecfd9d9bbc8abd088d7c8852b9b2b7
 }
 
 model UserRepository {

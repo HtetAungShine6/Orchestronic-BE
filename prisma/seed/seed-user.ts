@@ -3,15 +3,7 @@ import { faker } from '@faker-js/faker';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  const usersData = Array.from({ length: 10 }).map(() => ({
-    name: faker.person.fullName(),
-    email: faker.internet.email(),
-    role: faker.helpers.arrayElement([Role.Admin, Role.IT, Role.Developer]),
-  }));
-
-  await prisma.user.createMany({ data: usersData });
-}
+async function main() {}
 
 main()
   .catch((e: unknown) => {

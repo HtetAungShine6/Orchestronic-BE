@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '@prisma/client';
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { CreateResourceDto } from 'src/request/dto/create-resource.dto';
 
 export class CreateRepositoriesDto {
   @IsString()
@@ -27,4 +29,18 @@ export class CreateRepositoriesDto {
     example: ['u6512345@au.edu, u6512190@au.edu'],
   })
   collaborators: string[];
+
+  @IsString()
+  @IsNotEmpty()
+  @ApiProperty({
+    example: '123',
+    description: 'The ID of the request associated with the repository',
+  })
+  requestId: string;
+
+  @ApiProperty({
+    type: CreateResourceDto,
+    description: 'The resources associated with the repository',
+  })
+  resources: CreateResourceDto;
 }
