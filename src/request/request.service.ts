@@ -12,6 +12,8 @@ export class RequestService {
     return await this.databaseService.request.findMany({
       include: {
         resources: true,
+        repository: true,
+        owner: true,
       },
     });
   }
@@ -83,9 +85,21 @@ export class RequestService {
       },
     });
 
+    const last = await this.databaseService.request.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { displayCode: true },
+    });
+
+    const lastNumber = last?.displayCode
+      ? parseInt(last.displayCode.split('-')[1])
+      : 0;
+
+    const displayCode = `R-${lastNumber + 1}`;
+
     const newRequest = await this.databaseService.request.create({
       data: {
         description: request.description,
+        displayCode: displayCode,
         owner: {
           connect: {
             id: request.ownerId,
@@ -101,6 +115,11 @@ export class RequestService {
             id: newResource.id,
           },
         },
+      },
+      include: {
+        resources: true,
+        repository: true,
+        owner: true,
       },
     });
 

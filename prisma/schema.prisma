@@ -16,54 +16,36 @@ datasource db {
 
 model Request {
   id          String @id @default(uuid())
+  displayCode String @unique
   status      Status @default(Pending)
   description String
 
   owner   User   @relation(fields: [ownerId], references: [id])
   ownerId String @unique
 
-<<<<<<< HEAD
-  resourceGroup String
-  region        String
-  cloudProvider String
-  status        Status @default(Pending)
-  user          User   @relation(fields: [userId], references: [id])
-  userId      String
-  description   String
-  resources   Resources @relation(fields: [resourcesId], references: [id])
-  resourcesId String    @unique
-  date        DateTime  @default(now())
-}
-
-model Repository {
-  id          String      @id @default(cuid())
-  name        String      @unique
-  description String
-  developers  UserRepository[] 
-  Resources   Resources[]
-  Request     Request[]
-}
-=======
   repository   Repository @relation(fields: [repositoryId], references: [id])
   repositoryId String     @unique
 
   resources   Resources @relation(fields: [resourcesId], references: [id])
   resourcesId String    @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Repository {
   id          String  @id @default(cuid())
   name        String  @unique
   description String?
->>>>>>> ea45375888ecfd9d9bbc8abd088d7c8852b9b2b7
 
   request Request?
 
   resources   Resources @relation(fields: [resourcesId], references: [id])
   resourcesId String    @unique
 
-  collaborators User[]           @relation("RepositoryCollaborators")
-  status        RepositoryStatus @default(Pending)
+  collaborators  User[]           @relation("RepositoryCollaborators")
+  status         RepositoryStatus @default(Pending)
+  UserRepository UserRepository[]
 }
 
 model Resources {
@@ -124,14 +106,6 @@ model StorageInstance {
 }
 
 model User {
-<<<<<<< HEAD
-  id           String       @id @default(uuid())
-  name         String
-  email        String       @unique
-  role         Role
-  repositories UserRepository[]
-  Request      Request[]
-=======
   id    String @id @default(uuid())
   name  String
   email String @unique
@@ -139,13 +113,13 @@ model User {
 
   collaboratedRepos Repository[] @relation("RepositoryCollaborators")
 
-  request Request?
+  request        Request?
+  UserRepository UserRepository[]
 }
 
 enum RepositoryStatus {
   Created
   Pending
->>>>>>> ea45375888ecfd9d9bbc8abd088d7c8852b9b2b7
 }
 
 model UserRepository {
