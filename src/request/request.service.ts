@@ -103,6 +103,8 @@ export class RequestService {
         },
       },
     });
+
+    return newRequest;
   }
 
   async updateRequestInfo(id: number, updateData: Prisma.RequestUpdateInput) {
