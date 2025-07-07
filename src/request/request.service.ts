@@ -3,8 +3,6 @@ import { Prisma, Status } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ApiBody } from '@nestjs/swagger';
-import { CreateRepositoryDto } from './dto/create-repository.dto';
-import { connect } from 'http2';
 
 @Injectable()
 export class RequestService {
