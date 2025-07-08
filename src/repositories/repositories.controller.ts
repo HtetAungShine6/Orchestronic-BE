@@ -16,4 +16,9 @@ export class RepositoriesController {
   createRepository(@Body() repository: CreateRepositoriesDto) {
     return this.repositoriesService.createRepository(repository);
   }
+
+  @Get()
+  findAll() {
+    return this.repositoriesService.findAll();
+  }
 }

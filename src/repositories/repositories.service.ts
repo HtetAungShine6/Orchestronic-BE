@@ -6,6 +6,12 @@ import { CreateRepositoriesDto } from './dto/create-repository.dto';
 export class RepositoriesService {
   constructor(private readonly databaseService: DatabaseService) {}
 
+  async findAll() {
+    return await this.databaseService.repository.findMany({
+      include: { resources: true, collaborators: true, request: true },
+    });
+  }
+
   async findByName(name: string) {
     const foundRepository = await this.databaseService.repository.findUnique({
       where: { name },
