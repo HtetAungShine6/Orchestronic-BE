@@ -17,6 +17,12 @@ export class UserService {
     });
   }
 
+  async findOne(email: string): Promise<User | null> {
+    return await this.databaseService.user.findUnique({
+      where: { email },
+    });
+  }
+
   async findAllUsers() {
     return await this.databaseService.user.findMany();
   }

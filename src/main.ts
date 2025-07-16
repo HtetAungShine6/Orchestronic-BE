@@ -19,6 +19,15 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Orchestronic API')
     .setDescription('API documentation for Orchestronic')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+      },
+      'access-token',
+    )
     .setVersion('1.0')
     .build();
 

@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Request,
 } from '@nestjs/common';
 import { RequestService } from './request.service';
 import { Prisma, Status } from '@prisma/client';
@@ -35,8 +36,8 @@ export class RequestController {
 
   @Post()
   @ApiBody({ type: CreateRequestDto })
-  createRequest(@Body() request: CreateRequestDto) {
-    return this.requestService.createRequest(request);
+  createRequest(@Request() req, @Body() request: CreateRequestDto) {
+    return this.requestService.createRequest(request, req.user);
   }
 
   @Patch(':id')

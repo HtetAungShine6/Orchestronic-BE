@@ -32,9 +32,11 @@ export class RequestService {
   }
 
   @ApiBody({ type: CreateRequestDto })
-  async createRequest(dto: CreateRequestDto) {
+  async createRequest(dto: CreateRequestDto, user: any) {
+    console.log('User info from JWT:', user);
     const { repository, resources, ...request } = dto;
 
+    const ownerId = user.id;
     const resourceConfig = await this.databaseService.resourceConfig.create({
       data: {
         vms: {
@@ -90,7 +92,7 @@ export class RequestService {
         description: request.description,
         owner: {
           connect: {
-            id: request.ownerId,
+            id: ownerId,
           },
         },
         repository: {

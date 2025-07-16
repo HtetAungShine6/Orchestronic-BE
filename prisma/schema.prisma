@@ -42,7 +42,7 @@ model Repository {
   collaborators User[]           @relation("RepositoryCollaborators")
   status        RepositoryStatus @default(Pending)
 
-  UserRepository UserRepository[]
+  UserRepository ownedRepository[]
   RepositoryCollaborator RepositoryCollaborator[]
 }
 
@@ -111,7 +111,7 @@ model User {
 
   collaboratedRepos Repository[] @relation("RepositoryCollaborators")
   request Request?
-  UserRepository UserRepository[]
+  UserRepository ownedRepository[]
   RepositoryCollaborator RepositoryCollaborator[]
 }
 
@@ -120,7 +120,7 @@ enum RepositoryStatus {
   Pending
 }
 
-model UserRepository {
+model ownedRepository {
   userId       String
   repositoryId String
   user         User       @relation(fields: [userId], references: [id])

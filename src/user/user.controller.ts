@@ -6,19 +6,23 @@ import {
   Query,
   NotFoundException,
   ConflictException,
+  UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { FindUserByEmailDto } from './dto/find-user-by-email.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { User } from '@prisma/client';
+import { AuthGuard } from '@nestjs/passport';
 
+@ApiBearerAuth('access-token')
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @UseGuards(AuthGuard('jwt'))
   @Get()
   @ApiOperation({
     summary: 'Find all users',

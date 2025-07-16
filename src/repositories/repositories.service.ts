@@ -1,10 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UseGuards } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateRepositoriesDto } from './dto/create-repository.dto';
+import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
 export class RepositoriesService {
   constructor(private readonly databaseService: DatabaseService) {}
+
+  @UseGuards(AuthGuard('jwt'))
+  async getUserRepositories() {
+    const user = await this.databaseService.repository.findFirst({});
+    return user;
+  }
 
   async findByName(name: string) {
     const foundRepository = await this.databaseService.repository.findUnique({
@@ -91,7 +98,7 @@ export class RepositoriesService {
         name: repository.name,
         description: repository.description ?? '',
         collaborators: {
-          connect: repository.collaborators?.map((id) => ({ id })) || [],
+          connect: repository.collaborators?.map((email) => ({ email })) || [],
         },
         resources: {
           connect: {
