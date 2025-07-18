@@ -19,7 +19,6 @@ export class RequestService {
   }
 
   async findByStatus(status: Status) {
-    console.log('Finding requests with status:', status);
     return await this.databaseService.request.findMany({
       where: { status },
     });
@@ -33,7 +32,6 @@ export class RequestService {
 
   @ApiBody({ type: CreateRequestDto })
   async createRequest(dto: CreateRequestDto, user: any) {
-    console.log('User info from JWT:', user);
     const { repository, resources, ...request } = dto;
 
     const ownerId = user.id;

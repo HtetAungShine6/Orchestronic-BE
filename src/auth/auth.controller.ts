@@ -17,7 +17,6 @@ export class AuthController {
   @Public()
   @Post('exchange')
   async exchangeToken(@Body() authDto: AuthExchangeDto) {
-    console.log('Received Azure token:', authDto);
     if (!authDto) throw new BadRequestException('Azure token is required');
 
     const payload = await this.azureTokenService.verifyAzureToken(

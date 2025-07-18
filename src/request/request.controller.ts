@@ -15,6 +15,7 @@ import { Prisma, Status } from '@prisma/client';
 import { ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { decodeJwt } from 'jose';
 
 @ApiBearerAuth('access-token')
 @UseGuards(AuthGuard('jwt'))
@@ -41,7 +42,15 @@ export class RequestController {
   @Post()
   @ApiBody({ type: CreateRequestDto })
   createRequest(@Request() req, @Body() request: CreateRequestDto) {
-    return this.requestService.createRequest(request, req.user);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Authorization header missing or malformed');
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = decodeJwt(token);
+
+    return this.requestService.createRequest(request, decoded);
   }
 
   @Patch(':id')

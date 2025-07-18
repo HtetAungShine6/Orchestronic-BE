@@ -17,6 +17,7 @@ import { AuthModule } from './auth/auth.module';
 import { use } from 'passport';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { JwtStrategy } from './auth/strategies/jwt.strategy';
+import { ResourceModule } from './resource/resource.module';
 @Module({
   imports: [
     ServeStaticModule.forRoot({
@@ -38,6 +39,7 @@ import { JwtStrategy } from './auth/strategies/jwt.strategy';
     DatabaseModule,
     UserModule,
     RepositoriesModule,
+    ResourceModule,
     AuthModule,
   ],
   controllers: [AppController, UserController, RepositoriesController],
