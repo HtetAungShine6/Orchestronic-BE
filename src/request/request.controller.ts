@@ -15,6 +15,13 @@ import { Prisma, Status } from '@prisma/client';
 import { ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { AuthGuard } from '@nestjs/passport';
+import * as jwt from 'jsonwebtoken';
+
+interface RequestWithHeaders {
+  headers: {
+    authorization?: string;
+  };
+}
 
 @ApiBearerAuth('access-token')
 @UseGuards(AuthGuard('jwt'))
@@ -40,8 +47,11 @@ export class RequestController {
 
   @Post()
   @ApiBody({ type: CreateRequestDto })
-  async createRequest(@Request() req, @Body() request: CreateRequestDto) {
-    const authHeader = req.headers.authorization;
+  async createRequest(
+    @Request() req: RequestWithHeaders,
+    @Body() request: CreateRequestDto,
+  ) {
+    const authHeader = req.headers?.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new Error('Authorization header missing or malformed');
     }
@@ -49,25 +59,14 @@ export class RequestController {
     const token = authHeader.split(' ')[1];
 
     try {
-      console.log('Request Controller: Attempting to import jose library...');
-      const { decodeJwt } = await import('jose');
-      console.log(
-        'Request Controller: Successfully imported jose, decoding token...',
-      );
-      const decoded = decodeJwt(token);
+      console.log('Request Controller: Decoding token...');
+      // Decode the token without verification to get payload
+      const decoded = jwt.decode(token);
       console.log('Request Controller: Token decoded successfully:', decoded);
 
       return this.requestService.createRequest(request, decoded);
-    } catch (error) {
-      console.error(
-        'Request Controller: Error importing jose or decoding token:',
-        error,
-      );
-      console.error('Request Controller: Error details:', {
-        name: error?.name,
-        message: error?.message,
-        stack: error?.stack,
-      });
+    } catch {
+      console.error('Request Controller: Error decoding token');
       throw new Error('Invalid token - unable to process');
     }
   }

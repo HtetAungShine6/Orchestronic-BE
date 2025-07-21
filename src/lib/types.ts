@@ -12,4 +12,6 @@ export interface CustomJWTPayload {
   nbf?: number;
   exp?: number;
   iat?: number;
+  tid?: string; // Tenant ID
+  appid?: string; // Application (Client) ID
 }
