@@ -5,6 +5,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthController } from './auth.controller';
 import { AzureTokenService } from './azure-token.service';
 import { ShortTokenService } from './short-token.service';
+import { DatabaseService } from 'src/database/database.service';
 
 @Module({
   imports: [
@@ -15,6 +16,11 @@ import { ShortTokenService } from './short-token.service';
     UserModule,
   ],
   controllers: [AuthController],
-  providers: [AzureTokenService, ShortTokenService, JwtStrategy],
+  providers: [
+    AzureTokenService,
+    ShortTokenService,
+    JwtStrategy,
+    DatabaseService,
+  ],
 })
 export class AuthModule {}

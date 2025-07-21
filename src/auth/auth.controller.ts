@@ -1,17 +1,30 @@
 // auth.controller.ts
-import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AzureTokenService } from './azure-token.service';
 import { ShortTokenService } from './short-token.service';
 import { UserService } from '../user/user.service';
 import { AuthExchangeDto } from './dto/auth-exchange.dto';
 import { Public } from './public.decorator';
+import { JwtService } from '@nestjs/jwt';
+import { DatabaseService } from 'src/database/database.service';
+import { CustomJWTPayload } from 'src/lib/types';
+import { Cron } from '@nestjs/schedule';
+import { AuthRefreshDto } from './dto/auth-refresh.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private azureTokenService: AzureTokenService,
     private shortTokenService: ShortTokenService,
-    private readonly userService: UserService,
+    private userService: UserService,
+    private jwtService: JwtService,
+    private databaseService: DatabaseService,
   ) {}
 
   @Public()
@@ -42,20 +55,66 @@ export class AuthController {
     }
 
     // Create your own short token with minimal info
-    const shortToken = this.shortTokenService.createToken({
+    const shortToken = await this.shortTokenService.createTokens({
       id: user.id,
       email: user.email,
       role: user.role,
       name: user.name,
     });
 
-    return { token: shortToken };
+    return {
+      accessToken: shortToken.accessToken,
+      refreshToken: shortToken.refreshToken,
+    };
   }
 
-  // @UseGuards(LocalAuthGuard)
-  // @Post('/login')
-  // async login(@Request() req) {
-  //   const accessToken = this.authService.login(req.user);
-  //   return { accessToken };
-  // }
+  @Public()
+  @Post('refresh')
+  async refresh(@Body() authDto: AuthRefreshDto) {
+    const oldToken = authDto.refreshToken;
+
+    let payload: CustomJWTPayload;
+    try {
+      payload = this.jwtService.verify(oldToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const existing = await this.databaseService.refreshToken.findFirst({
+      where: {
+        token: oldToken,
+        userId: payload.id,
+      },
+    });
+
+    if (!existing) throw new UnauthorizedException('Token not found or reused');
+
+    // Delete old token (rotation step)
+    await this.databaseService.refreshToken.deleteMany({
+      where: {
+        token: oldToken,
+      },
+    });
+
+    const user = await this.userService.findByEmail(payload.email ?? '');
+    if (!user) throw new UnauthorizedException('User not found');
+
+    // Issue new access + refresh token
+    const tokens = await this.shortTokenService.createTokens(user);
+
+    return tokens;
+  }
+
+  @Cron('0 0 * * *')
+  async deleteExpiredTokens() {
+    await this.databaseService.refreshToken.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
+  }
 }

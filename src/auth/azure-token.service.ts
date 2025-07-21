@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
+import { CustomJWTPayload } from 'src/lib/types';
 
 @Injectable()
 export class AzureTokenService {
-  async verifyAzureToken(token: string): Promise<any> {
-    let decoded;
+  async verifyAzureToken(token: string): Promise<CustomJWTPayload | null> {
+    let decoded: CustomJWTPayload;
     try {
       decoded = decodeJwt(token);
-    } catch (error) {
+    } catch {
       return null;
     }
 

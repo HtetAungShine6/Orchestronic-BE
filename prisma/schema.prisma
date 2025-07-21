@@ -46,7 +46,7 @@ model Repository {
   collaborators User[]           @relation("RepositoryCollaborators")
   status        RepositoryStatus @default(Pending)
 
-  UserRepository ownedRepository[]
+  UserRepository         ownedRepository[]
   RepositoryCollaborator RepositoryCollaborator[]
 }
 
@@ -113,10 +113,11 @@ model User {
   email String @unique
   role  Role
 
-  collaboratedRepos Repository[] @relation("RepositoryCollaborators")
-  request Request?
-  UserRepository ownedRepository[]
+  collaboratedRepos      Repository[]             @relation("RepositoryCollaborators")
+  request                Request?
+  UserRepository         ownedRepository[]
   RepositoryCollaborator RepositoryCollaborator[]
+  RefreshToken           RefreshToken[]
 }
 
 enum RepositoryStatus {
@@ -137,15 +138,24 @@ model RepositoryCollaborator {
   userId       String
   repositoryId String
 
-  user         User       @relation(fields: [userId], references: [id])
-  repository   Repository @relation(fields: [repositoryId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  repository Repository @relation(fields: [repositoryId], references: [id])
 
-  assignedAt   DateTime   @default(now()) // optional: track metadata
+  assignedAt DateTime @default(now()) // optional: track metadata
 
   @@id([userId, repositoryId]) // Composite PK to prevent duplicates
   @@map("RepositoryCollaborators") // Name the actual table in the DB
 }
 
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
 enum Status {
   Pending
