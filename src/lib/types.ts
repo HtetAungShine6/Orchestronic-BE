@@ -1,10 +1,15 @@
-import { JWTPayload } from 'jose';
-
-export interface CustomJWTPayload extends JWTPayload {
+export interface CustomJWTPayload {
   id?: string;
   email?: string;
   name?: string;
   role?: string;
   oid?: string;
   upn?: string;
+  iss?: string;
+  sub?: string;
+  aud?: string | string[];
+  jti?: string;
+  nbf?: number;
+  exp?: number;
+  iat?: number;
 }

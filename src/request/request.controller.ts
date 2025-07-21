@@ -41,13 +41,14 @@ export class RequestController {
 
   @Post()
   @ApiBody({ type: CreateRequestDto })
-  createRequest(@Request() req, @Body() request: CreateRequestDto) {
+  async createRequest(@Request() req, @Body() request: CreateRequestDto) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new Error('Authorization header missing or malformed');
     }
 
     const token = authHeader.split(' ')[1];
+    const { decodeJwt } = await import('jose');
     const decoded = decodeJwt(token);
 
     return this.requestService.createRequest(request, decoded);
