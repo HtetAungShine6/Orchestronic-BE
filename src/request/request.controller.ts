@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -13,10 +14,16 @@ import {
 } from '@nestjs/common';
 import { RequestService } from './request.service';
 import { Prisma, Status } from '@prisma/client';
-import { ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { AuthGuard } from '@nestjs/passport';
 import * as jwt from 'jsonwebtoken';
+import { UpdateRequestStatusDto } from './dto/request-status.dto';
 
 interface RequestWithHeaders {
   headers: {
@@ -48,6 +55,9 @@ export class RequestController {
 
   @Get()
   @ApiQuery({ name: 'id', required: true, description: 'Format: R-[number]' })
+  @ApiOperation({
+    summary: 'Get request data by Request ID',
+  })
   findWithRequestID(@Query('id') id: string) {
     if (!/^R-\d+$/.test(id)) {
       throw new BadRequestException(
@@ -88,7 +98,26 @@ export class RequestController {
     @Param('id') id: string,
     @Body() requestUpdate: Prisma.RequestUpdateInput,
   ) {
-    return this.requestService.updateRequestInfo(+id, { ...requestUpdate });
+    return this.requestService.updateRequestInfo(id, { ...requestUpdate });
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({
+    summary: 'Update request status by request ID',
+  })
+  async updateRequestStatus(
+    @Param('id') id: string,
+    @Body() { status }: UpdateRequestStatusDto,
+  ) {
+    const updated = await this.requestService.updateRequestInfo(id, {
+      status,
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Request with id ${id} not found`);
+    }
+
+    return updated;
   }
 
   @Delete(':id')

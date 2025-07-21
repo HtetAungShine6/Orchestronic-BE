@@ -127,16 +127,10 @@ export class RequestService {
     return newRequest;
   }
 
-  async updateRequestInfo(id: number, updateData: Prisma.RequestUpdateInput) {
+  async updateRequestInfo(id: string, updateData: Prisma.RequestUpdateInput) {
     return this.databaseService.request.update({
       where: { id: id.toString() },
       data: updateData,
-    });
-  }
-
-  async removeRequest(id: number) {
-    return this.databaseService.request.delete({
-      where: { id: id.toString() },
     });
   }
 
@@ -155,5 +149,11 @@ export class RequestService {
     }
 
     return request;
+  }
+
+  async removeRequest(id: number) {
+    return this.databaseService.request.delete({
+      where: { id: id.toString() },
+    });
   }
 }
