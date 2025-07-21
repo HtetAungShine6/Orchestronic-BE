@@ -3,12 +3,14 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -108,7 +110,15 @@ export class RequestController {
   async updateRequestStatus(
     @Param('id') id: string,
     @Body() { status }: UpdateRequestStatusDto,
+    @Req() req: any,
   ) {
+    const user = req.user;
+
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'IT')) {
+      throw new ForbiddenException(
+        'You do not have permission to update status',
+      );
+    }
     const updated = await this.requestService.updateRequestInfo(id, {
       status,
     });
