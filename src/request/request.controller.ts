@@ -63,24 +63,24 @@ export class RequestController {
     return this.requestService.findByStatus(status);
   }
 
-  @Get(':id')
-  findById(@Param('id') id: string) {
-    return this.requestService.findById(+id);
-  }
-
   @Get('displayCode')
   @ApiQuery({
     name: 'displayCode',
     description: 'Format: R-[number]',
     required: true,
   })
-  findWithRequestDisplayCode(@Query('displayCode') id: string) {
-    if (!/^R-\d+$/.test(id)) {
+  async findWithRequestDisplayCode(@Query('displayCode') displayCode: string) {
+    if (!/^R-\d+$/.test(displayCode)) {
       throw new BadRequestException(
         'Invalid displayCode format. Expected format: R-<number>',
       );
     }
-    return this.requestService.findWithRequestDisplayCode(id);
+    return this.requestService.findWithRequestDisplayCode(displayCode);
+  }
+
+  @Get(':id')
+  findById(@Param('id') id: string) {
+    return this.requestService.findById(+id);
   }
 
   @Post()
