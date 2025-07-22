@@ -28,17 +28,17 @@ export class ShortTokenService {
 
     const accessToken = this.jwtService.sign(accessTokenPayload, {
       secret: process.env.JWT_SECRET,
-      expiresIn: '1h', // Access token: 1 hour
+      expiresIn: '15m',
     });
 
     const refreshToken = this.jwtService.sign(refreshTokenPayload, {
       secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: '1h', // Match your actual requirement
+      expiresIn: '30d',
     });
 
     // Save to DB with matching expiration
     const expiry = new Date();
-    expiry.setHours(expiry.getHours() + 1); // 1 hour from now
+    expiry.setDate(expiry.getDate() + 30); // 30 days from now
 
     await this.databaseService.refreshToken.create({
       data: {

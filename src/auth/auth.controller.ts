@@ -78,8 +78,10 @@ export class AuthController {
       payload = this.jwtService.verify(oldToken, {
         secret: process.env.JWT_REFRESH_SECRET,
       });
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new UnauthorizedException(`Invalid refresh token: ${errorMessage}`);
     }
 
     const existing = await this.databaseService.refreshToken.findFirst({
@@ -105,6 +107,19 @@ export class AuthController {
     const tokens = await this.shortTokenService.createTokens(user);
 
     return tokens;
+  }
+
+  @Public()
+  @Post('verify')
+  verifyToken(@Body() { token }: { token: string }) {
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.JWT_SECRET,
+      }) as unknown as CustomJWTPayload;
+      return { valid: true, payload };
+    } catch {
+      return { valid: false, error: 'Token expired or invalid' };
+    }
   }
 
   @Cron('0 0 * * *')
