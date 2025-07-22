@@ -15,19 +15,23 @@ export class ShortTokenService {
     role: string;
     name: string;
   }): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload = {
+    const accessTokenPayload = {
       id: user.id,
       email: user.email,
       role: user.role,
       name: user.name,
     };
 
-    const accessToken = this.jwtService.sign(payload, {
+    const refreshTokenPayload = {
+      id: user.id,
+    };
+
+    const accessToken = this.jwtService.sign(accessTokenPayload, {
       secret: process.env.JWT_SECRET,
       expiresIn: '1h',
     });
 
-    const refreshToken = this.jwtService.sign(payload, {
+    const refreshToken = this.jwtService.sign(refreshTokenPayload, {
       secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: '7d',
     });
