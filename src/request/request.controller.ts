@@ -58,10 +58,6 @@ export class RequestController {
     required: true,
   })
   async findWithRequestDisplayCode(@Query('displayCode') displayCode: string) {
-    console.log(
-      'Request Controller: Finding request with displayCode:',
-      displayCode,
-    );
     if (!/^R-\d+$/.test(displayCode)) {
       throw new BadRequestException(
         'Invalid displayCode format. Expected format: R-<number>',
