@@ -17,34 +17,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKeyProvider: (request, rawJwtToken, done) => {
-        if (this.pemKey) {
-          done(null, this.pemKey);
-        } else {
-          const kid = this.authService.extractKidFromToken(
-            rawJwtToken as string,
-          );
-          this.authService
-            .getAzurePemKey(kid)
-            .then((key: string) => {
-              try {
-                jwt.verify(rawJwtToken as string, key, {
-                  algorithms: ['RS256'],
-                });
-              } catch (error) {
-                console.error('JWT Strategy: Error verifying token:', error);
-                return done(error, undefined);
-              }
-              this.pemKey = key;
-              done(null, key);
-            })
-            .catch((error) => {
-              console.error('JWT Strategy: Error retrieving PEM key:', error);
-              done(error, undefined);
-            });
-        }
-      },
-      algorithms: ['RS256'],
+      secretOrKey: 'eSo3PoOYP7BhJFaqfnsKz52mo3cpV1vb3M38IGzaFt4=',
     });
   }
 

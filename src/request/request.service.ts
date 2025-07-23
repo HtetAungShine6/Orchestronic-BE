@@ -12,7 +12,7 @@ export class RequestService {
 
   async findAll(user: AzureADJwtPayload) {
     return await this.databaseService.request.findMany({
-      where: { ownerId: user.id },
+      where: { ownerId: user.email },
       include: {
         resources: true,
         repository: true,

@@ -38,17 +38,17 @@ export class RequestController {
   @Get()
   findAll(@Request() req: RequestWithHeaders) {
     const authHeader = req.headers?.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader || !authHeader.startsWith('Bearer')) {
       throw new Error('Authorization header missing or malformed');
     }
 
     const token = authHeader.split(' ')[1];
 
     try {
-      // console.log('Request Controller: Decoding token...');
+      console.log('Request Controller: Decoding token...');
       // Decode the token without verification to get payload
       const decoded = jwt.decode(token) as AzureADJwtPayload;
-      // console.log('Request Controller: Token decoded successfully:', decoded);
+      console.log('Request Controller: Token decoded successfully:', decoded);
 
       return this.requestService.findAll(decoded);
     } catch {
