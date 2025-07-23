@@ -1,9 +1,10 @@
-export interface AzureADJwtPayload {
-  id?: string;
-  email?: string;
-  name?: string;
-  role?: string;
-  upn?: string;
+export interface BackendJwtPayload {
+  id: string;
+  email: string;
+  role: string;
+  name: string;
+  iat: number;
+  exp: number;
 }
 
 export interface RequestWithHeaders {

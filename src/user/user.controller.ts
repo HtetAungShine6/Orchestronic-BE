@@ -18,7 +18,8 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { AuthGuard } from '@nestjs/passport';
-import { AzureADJwtPayload, RequestWithHeaders } from 'src/lib/types';
+import { BackendJwtPayload, RequestWithHeaders } from 'src/lib/types';
+import { de } from '@faker-js/faker/.';
 
 // @ApiBearerAuth('access-token')
 // @UseGuards(AuthGuard('jwt'))
@@ -105,9 +106,11 @@ export class UserController {
     const token = authHeader.split(' ')[1];
 
     try {
-      const decoded = jwt.decode(token) as AzureADJwtPayload;
+      const decoded = jwt.decode(token) as BackendJwtPayload;
 
-      return this.userService.findByEmail(decoded.upn ?? '');
+      console.log(decoded);
+
+      return this.userService.findByEmail(decoded.email ?? '');
     } catch {
       console.error('Request Controller: Error decoding token');
       throw new Error('Invalid token - unable to process');

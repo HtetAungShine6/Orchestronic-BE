@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User } from '@prisma/client';
-import { AzureADJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from 'src/lib/types';
 
 @Injectable()
 export class UserService {
@@ -54,7 +54,7 @@ export class UserService {
     });
   }
 
-  async findUserInfo(user: AzureADJwtPayload) {
+  async findUserInfo(user: BackendJwtPayload) {
     return await this.databaseService.user.findUnique({
       where: { id: user.id },
     });

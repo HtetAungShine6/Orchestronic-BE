@@ -2,13 +2,13 @@ import { Injectable, UseGuards } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateRepositoriesDto } from './dto/create-repository.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { AzureADJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from 'src/lib/types';
 
 @Injectable()
 export class RepositoriesService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async findAll(user: AzureADJwtPayload) {
+  async findAll(user: BackendJwtPayload) {
     const repoIds = await this.databaseService.request.findMany({
       where: {
         ownerId: user.id,

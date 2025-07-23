@@ -3,8 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../auth.service';
-import * as jwt from 'jsonwebtoken';
-import { AzureADJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from 'src/lib/types';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -21,9 +20,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: AzureADJwtPayload) {
+  validate(payload: BackendJwtPayload) {
     return {
-      email: payload.upn,
+      email: payload.email,
       name: payload.name,
     };
   }

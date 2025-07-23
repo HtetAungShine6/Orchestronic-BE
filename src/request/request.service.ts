@@ -4,13 +4,13 @@ import { DatabaseService } from '../database/database.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ApiBody } from '@nestjs/swagger';
 import { Repository } from '@prisma/client';
-import { AzureADJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from 'src/lib/types';
 
 @Injectable()
 export class RequestService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async findAll(user: AzureADJwtPayload) {
+  async findAll(user: BackendJwtPayload) {
     return await this.databaseService.request.findMany({
       where: { ownerId: user.email },
       include: {
@@ -34,7 +34,7 @@ export class RequestService {
   }
 
   @ApiBody({ type: CreateRequestDto })
-  async createRequest(dto: CreateRequestDto, user: AzureADJwtPayload) {
+  async createRequest(dto: CreateRequestDto, user: BackendJwtPayload) {
     const { repository, resources, ...request } = dto;
 
     const ownerId = user.id;
