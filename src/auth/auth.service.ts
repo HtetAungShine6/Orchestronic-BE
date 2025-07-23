@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import * as jwkToPem from 'jwk-to-pem';
 import axios, { AxiosResponse } from 'axios';
 import { JwtHeader } from 'jsonwebtoken';
 import * as jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
 
 interface AzureADKeys {
   keys: Array<{
@@ -33,6 +33,33 @@ export class AuthService {
     }
   }
 
+  private jwkToPem(jwk: AzureADKeys['keys'][number]): string {
+    // Use the x5c certificate if available (most reliable for Azure AD)
+    if (jwk.x5c && jwk.x5c.length > 0) {
+      const cert = jwk.x5c[0];
+      const formattedCert = cert.match(/.{1,64}/g)?.join('\n') || cert;
+      return `-----BEGIN CERTIFICATE-----\n${formattedCert}\n-----END CERTIFICATE-----`;
+    }
+
+    // Fallback: construct RSA public key from n and e
+    try {
+      const keyObject = crypto.createPublicKey({
+        key: {
+          kty: 'RSA',
+          n: jwk.n,
+          e: jwk.e,
+        },
+        format: 'jwk',
+      });
+
+      return keyObject.export({ type: 'spki', format: 'pem' }) as string;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to convert JWK to PEM: ${errorMessage}`);
+    }
+  }
+
   async getAzurePemKey(kid: string | null): Promise<string> {
     if (!kid) {
       throw new Error('KID is null');
@@ -49,7 +76,7 @@ export class AuthService {
     }
 
     try {
-      const pem = jwkToPem(jwk) as string;
+      const pem = this.jwkToPem(jwk);
       return pem;
     } catch (err) {
       console.error('Failed to convert JWK to PEM:', err);
