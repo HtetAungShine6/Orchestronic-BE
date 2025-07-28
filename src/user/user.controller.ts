@@ -18,6 +18,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { BackendJwtPayload, RequestWithHeaders } from 'src/lib/types';
+import { extractToken } from 'src/lib/extract-token';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 // @ApiBearerAuth('access-token')
@@ -97,12 +98,7 @@ export class UserController {
     summary: 'Get all requests for the authenticated user',
   })
   findRequestsForUser(@Request() req: RequestWithHeaders) {
-    const authHeader = req.headers?.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new Error('Authorization header missing or malformed');
-    }
-
-    const token = authHeader.split(' ')[1];
+    const token = extractToken(req);
 
     try {
       const decoded = jwt.decode(token) as BackendJwtPayload;

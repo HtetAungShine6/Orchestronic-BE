@@ -28,6 +28,7 @@ import * as jwt from 'jsonwebtoken';
 import { UpdateRequestStatusDto } from './dto/request-status.dto';
 import { BackendJwtPayload } from 'src/lib/types';
 import { RequestWithHeaders } from 'src/lib/types';
+import { extractToken } from 'src/lib/extract-token';
 
 @ApiBearerAuth('access-token')
 @UseGuards(AuthGuard('jwt'))
@@ -37,12 +38,7 @@ export class RequestController {
 
   @Get()
   findAll(@Request() req: RequestWithHeaders) {
-    const authHeader = req.headers?.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer')) {
-      throw new Error('Authorization header missing or malformed');
-    }
-
-    const token = authHeader.split(' ')[1];
+    const token = extractToken(req);
 
     try {
       // console.log('Request Controller: Decoding token...');
@@ -89,13 +85,7 @@ export class RequestController {
     @Request() req: RequestWithHeaders,
     @Body() request: CreateRequestDto,
   ) {
-    const authHeader = req.headers?.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new Error('Authorization header missing or malformed');
-    }
-
-    const token = authHeader.split(' ')[1];
-
+    const token = extractToken(req);
     try {
       // console.log('Request Controller: Decoding token...');
       // Decode the token without verification to get payload

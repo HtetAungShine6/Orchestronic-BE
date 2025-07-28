@@ -6,6 +6,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { BackendJwtPayload, RequestWithHeaders } from 'src/lib/types';
 import * as jwt from 'jsonwebtoken';
+import { extractToken } from 'src/lib/extract-token';
 
 @Controller('repositories')
 export class RepositoriesController {
@@ -25,11 +26,7 @@ export class RepositoriesController {
   @UseGuards(AuthGuard('jwt'))
   @Get()
   findAll(@Request() req: RequestWithHeaders) {
-    const authHeader = req.headers?.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new Error('Authorization header missing or malformed');
-    }
-    const token = authHeader.split(' ')[1];
+    const token = extractToken(req);
 
     try {
       // console.log('Request Controller: Decoding token...');
