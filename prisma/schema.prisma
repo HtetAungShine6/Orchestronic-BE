@@ -21,7 +21,7 @@ model Request {
   description String
 
   owner   User   @relation(fields: [ownerId], references: [id])
-  ownerId String @unique
+  ownerId String
 
   repository   Repository @relation(fields: [repositoryId], references: [id])
   repositoryId String     @unique
