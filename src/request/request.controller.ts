@@ -26,8 +26,8 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { AuthGuard } from '@nestjs/passport';
 import * as jwt from 'jsonwebtoken';
 import { UpdateRequestStatusDto } from './dto/request-status.dto';
-import { BackendJwtPayload } from 'src/lib/types';
-import { RequestWithHeaders } from 'src/lib/types';
+import { BackendJwtPayload } from '../lib/types';
+import { RequestWithHeaders } from '../lib/types';
 import { extractToken } from '../lib/extract-token';
 
 @ApiBearerAuth('access-token')

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { CustomJWTPayload } from 'src/lib/types';
+import { CustomJWTPayload } from '../lib/types';
 
 import * as jwt from 'jsonwebtoken';
 

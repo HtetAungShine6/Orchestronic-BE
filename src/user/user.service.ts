@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User } from '@prisma/client';
-import { BackendJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from '../lib/types';
 
 @Injectable()
 export class UserService {

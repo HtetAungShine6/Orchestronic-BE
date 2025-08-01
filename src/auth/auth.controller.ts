@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Post,
-  Body,
-  BadRequestException,
-  UnauthorizedException,
-  Res,
-  Req,
-} from '@nestjs/common';
+import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
 import { AzureTokenService } from './azure-token.service';
 import { ShortTokenService } from './short-token.service';
 import { UserService } from '../user/user.service';
@@ -16,12 +8,7 @@ import {
 } from './dto/auth-exchange.dto';
 import { Public } from './public.decorator';
 import { JwtService } from '@nestjs/jwt';
-import { DatabaseService } from 'src/database/database.service';
-import { CustomJWTPayload } from 'src/lib/types';
-import { Cron } from '@nestjs/schedule';
-import { AuthRefreshDto, AuthRefreshResponseDto } from './dto/auth-refresh.dto';
-import { Response, Request } from 'express';
-import { VerifyTokenDto } from './dto/verify-token.dto';
+import { DatabaseService } from '../database/database.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Authentication')

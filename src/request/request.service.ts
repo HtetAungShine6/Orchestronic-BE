@@ -8,7 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ApiBody } from '@nestjs/swagger';
 import { Repository } from '@prisma/client';
-import { BackendJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from '../lib/types';
 
 @Injectable()
 export class RequestService {
