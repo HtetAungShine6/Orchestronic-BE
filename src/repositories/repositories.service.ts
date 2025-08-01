@@ -28,8 +28,12 @@ export class RepositoriesService {
       },
       include: {
         resources: true,
-        collaborators: true,
         request: true,
+        RepositoryCollaborator: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 

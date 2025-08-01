@@ -1,5 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CollaboratorDto {
+  @IsString()
+  @IsNotEmpty()
+  @ApiProperty({
+    example: 'collaborator-id',
+    description: 'ID of the collaborator',
+  })
+  id: string;
+}
 
 export class CreateRepositoryDto {
   @IsString()
@@ -18,4 +35,15 @@ export class CreateRepositoryDto {
     required: false,
   })
   description: string;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CollaboratorDto)
+  @ApiProperty({
+    type: [CollaboratorDto],
+    description: 'List of collaborators for the repository',
+    required: false,
+  })
+  collaborators?: CollaboratorDto[];
 }

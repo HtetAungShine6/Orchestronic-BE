@@ -61,13 +61,28 @@ export class RequestController {
     description: 'Format: R-[number]',
     required: true,
   })
-  async findWithRequestDisplayCode(@Query('displayCode') displayCode: string) {
+  async findWithRequestDisplayCode(
+    @Query('displayCode') displayCode: string,
+    @Request() req: RequestWithHeaders,
+  ) {
+    const token = extractToken(req);
+
     if (!/^R-\d+$/.test(displayCode)) {
       throw new BadRequestException(
         'Invalid displayCode format. Expected format: R-<number>',
       );
     }
-    return this.requestService.findWithRequestDisplayCode(displayCode);
+
+    try {
+      const decoded = jwt.decode(token) as BackendJwtPayload;
+      return this.requestService.findWithRequestDisplayCode(
+        displayCode,
+        decoded,
+      );
+    } catch {
+      console.error('Request Controller: Error decoding token');
+      throw new Error('Invalid token - unable to process');
+    }
   }
 
   @Get(':id')
