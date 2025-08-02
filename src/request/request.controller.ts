@@ -26,9 +26,9 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { AuthGuard } from '@nestjs/passport';
 import * as jwt from 'jsonwebtoken';
 import { UpdateRequestStatusDto } from './dto/request-status.dto';
-import { BackendJwtPayload } from 'src/lib/types';
-import { RequestWithHeaders } from 'src/lib/types';
-import { extractToken } from 'src/lib/extract-token';
+import { BackendJwtPayload } from '../lib/types';
+import { RequestWithHeaders } from '../lib/types';
+import { extractToken } from '../lib/extract-token';
 
 @ApiBearerAuth('access-token')
 @UseGuards(AuthGuard('jwt'))
@@ -41,11 +41,7 @@ export class RequestController {
     const token = extractToken(req);
 
     try {
-      // console.log('Request Controller: Decoding token...');
-      // Decode the token without verification to get payload
       const decoded = jwt.decode(token) as BackendJwtPayload;
-      // console.log('Request Controller: Token decoded successfully:', decoded);
-
       return this.requestService.findAll(decoded);
     } catch {
       console.error('Request Controller: Error decoding token');
@@ -65,13 +61,28 @@ export class RequestController {
     description: 'Format: R-[number]',
     required: true,
   })
-  async findWithRequestDisplayCode(@Query('displayCode') displayCode: string) {
+  async findWithRequestDisplayCode(
+    @Query('displayCode') displayCode: string,
+    @Request() req: RequestWithHeaders,
+  ) {
+    const token = extractToken(req);
+
     if (!/^R-\d+$/.test(displayCode)) {
       throw new BadRequestException(
         'Invalid displayCode format. Expected format: R-<number>',
       );
     }
-    return this.requestService.findWithRequestDisplayCode(displayCode);
+
+    try {
+      const decoded = jwt.decode(token) as BackendJwtPayload;
+      return this.requestService.findWithRequestDisplayCode(
+        displayCode,
+        decoded,
+      );
+    } catch {
+      console.error('Request Controller: Error decoding token');
+      throw new Error('Invalid token - unable to process');
+    }
   }
 
   @Get(':id')
@@ -87,11 +98,7 @@ export class RequestController {
   ) {
     const token = extractToken(req);
     try {
-      // console.log('Request Controller: Decoding token...');
-      // Decode the token without verification to get payload
       const decoded = jwt.decode(token) as BackendJwtPayload;
-      // console.log('Request Controller: Token decoded successfully:', decoded);
-
       return this.requestService.createRequest(request, decoded);
     } catch {
       console.error('Request Controller: Error decoding token');

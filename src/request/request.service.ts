@@ -1,10 +1,14 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma, Status } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ApiBody } from '@nestjs/swagger';
 import { Repository } from '@prisma/client';
-import { BackendJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from '../lib/types';
 
 @Injectable()
 export class RequestService {
@@ -12,7 +16,7 @@ export class RequestService {
 
   async findAll(user: BackendJwtPayload) {
     return await this.databaseService.request.findMany({
-      where: { ownerId: user.email },
+      where: { ownerId: user.id },
       include: {
         resources: true,
         repository: true,
@@ -35,6 +39,7 @@ export class RequestService {
 
   @ApiBody({ type: CreateRequestDto })
   async createRequest(dto: CreateRequestDto, user: BackendJwtPayload) {
+    console.log(dto);
     const { repository, resources, ...request } = dto;
 
     const ownerId = user.id;
@@ -105,6 +110,16 @@ export class RequestService {
       throw error;
     }
 
+    console.log('New repository created:', repository.collaborators);
+    if (repository.collaborators && repository.collaborators.length > 0) {
+      await this.databaseService.repositoryCollaborator.createMany({
+        data: repository.collaborators.map((collaborator) => ({
+          userId: collaborator.id,
+          repositoryId: newRepository.id,
+        })),
+      });
+    }
+
     const last = await this.databaseService.request.findFirst({
       orderBy: { createdAt: 'desc' },
       select: { displayCode: true },
@@ -153,18 +168,41 @@ export class RequestService {
     });
   }
 
-  async findWithRequestDisplayCode(displayCode: string) {
+  async findWithRequestDisplayCode(
+    displayCode: string,
+    user: BackendJwtPayload,
+  ) {
     const request = await this.databaseService.request.findUnique({
-      where: { displayCode },
+      where: { ownerId: user.id, displayCode },
       include: {
-        resources: true,
-        repository: true,
+        resources: {
+          include: {
+            resourceConfig: {
+              include: {
+                vms: true,
+                dbs: true,
+                sts: true,
+              },
+            },
+          },
+        },
+        repository: {
+          include: {
+            RepositoryCollaborator: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
         owner: true,
       },
     });
 
     if (!request) {
-      throw new Error(`Request with displayCode ${displayCode} not found`);
+      throw new UnauthorizedException(
+        "Request not found or you don't have access to it",
+      );
     }
 
     return request;

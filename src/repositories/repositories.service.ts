@@ -2,7 +2,7 @@ import { Injectable, UseGuards } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateRepositoriesDto } from './dto/create-repository.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { BackendJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from '../lib/types';
 
 @Injectable()
 export class RepositoriesService {
@@ -28,8 +28,12 @@ export class RepositoriesService {
       },
       include: {
         resources: true,
-        collaborators: true,
         request: true,
+        RepositoryCollaborator: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 

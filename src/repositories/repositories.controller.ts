@@ -4,9 +4,9 @@ import { RepositoriesService } from './repositories.service';
 import { CreateRepositoriesDto } from './dto/create-repository.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { BackendJwtPayload, RequestWithHeaders } from 'src/lib/types';
+import { BackendJwtPayload, RequestWithHeaders } from '../lib/types';
 import * as jwt from 'jsonwebtoken';
-import { extractToken } from 'src/lib/extract-token';
+import { extractToken } from '../lib/extract-token';
 
 @Controller('repositories')
 export class RepositoriesController {

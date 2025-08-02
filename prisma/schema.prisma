@@ -21,7 +21,7 @@ model Request {
   description String
 
   owner   User   @relation(fields: [ownerId], references: [id])
-  ownerId String @unique
+  ownerId String
 
   repository   Repository @relation(fields: [repositoryId], references: [id])
   repositoryId String     @unique
@@ -114,7 +114,7 @@ model User {
   role  Role
 
   collaboratedRepos      Repository[]             @relation("RepositoryCollaborators")
-  request                Request?
+  request                Request[]
   UserRepository         ownedRepository[]
   RepositoryCollaborator RepositoryCollaborator[]
   RefreshToken           RefreshToken[]

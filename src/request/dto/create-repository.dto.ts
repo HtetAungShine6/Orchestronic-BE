@@ -4,8 +4,19 @@ import {
   IsNotEmpty,
   IsOptional,
   IsArray,
-  ArrayNotEmpty,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CollaboratorDto {
+  @IsString()
+  @IsNotEmpty()
+  @ApiProperty({
+    example: 'collaborator-id',
+    description: 'ID of the collaborator',
+  })
+  id: string;
+}
 
 export class CreateRepositoryDto {
   @IsString()
@@ -23,16 +34,16 @@ export class CreateRepositoryDto {
     description: 'A description of the repository associated with the request',
     required: false,
   })
-  description?: string;
+  description: string;
 
   @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
   @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CollaboratorDto)
   @ApiProperty({
-    example: ['user-id-1', 'user-id-2'],
-    description: 'List of user IDs to be added as collaborators',
+    type: [CollaboratorDto],
+    description: 'List of collaborators for the repository',
     required: false,
   })
-  collaborators?: string[];
+  collaborators?: CollaboratorDto[];
 }
