@@ -93,8 +93,10 @@ export class RequestService {
             },
           },
           RepositoryCollaborator: {
-            create: repository.collaborators?.map((userId) => ({
-              user: { connect: { id: userId } },
+            create: repository.collaborators?.map((collaborator) => ({
+              user: {
+                connect: { id: collaborator.id, email: collaborator.email },
+              },
             })),
           },
         },

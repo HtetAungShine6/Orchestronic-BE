@@ -27,6 +27,8 @@ model Request {
   repositoryId String     @unique
 
   resources   Resources @relation(fields: [resourcesId], references: [id])
+  ResourceConfig ResourceConfig @relation(fields: [resourceConfigId], references: [id])
+  resourceConfigId ResourceConfig
   resourcesId String    @unique
 
   createdAt DateTime @default(now())

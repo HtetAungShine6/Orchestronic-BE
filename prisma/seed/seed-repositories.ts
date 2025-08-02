@@ -7,6 +7,7 @@ async function main() {
   const repositories = Array.from({ length: 10 }).map(() => ({
     name: `repo-${faker.word.adjective()}-${faker.word.noun()}-${faker.number.int({ min: 1, max: 999 })}`,
     description: faker.lorem.sentence(),
+    resourcesId: faker.string.uuid(),
   }));
 
   await prisma.repository.createMany({
