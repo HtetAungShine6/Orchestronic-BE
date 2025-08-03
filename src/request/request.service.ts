@@ -20,7 +20,17 @@ export class RequestService {
     return await this.databaseService.request.findMany({
       where: { ownerId: user.id },
       include: {
-        resources: true,
+        resources: {
+          include: {
+            resourceConfig: {
+              include: {
+                vms: true,
+                dbs: true,
+                sts: true,
+              },
+            },
+          },
+        },
         repository: true,
         owner: true,
       },
@@ -125,7 +135,17 @@ export class RequestService {
         resources: { connect: { id: newResource.id } },
       },
       include: {
-        resources: true,
+        resources: {
+          include: {
+            resourceConfig: {
+              include: {
+                vms: true,
+                dbs: true,
+                sts: true,
+              },
+            },
+          },
+        },
         repository: true,
         owner: true,
       },
