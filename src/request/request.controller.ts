@@ -12,10 +12,11 @@ import {
   Query,
   Req,
   Request,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { RequestService } from './request.service';
-import { Prisma, Status } from '@prisma/client';
+import { Prisma, Role, Status } from '@prisma/client';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -32,6 +33,7 @@ import { RequestWithHeaders } from '../lib/types';
 import { extractToken } from '../lib/extract-token';
 import { GetVmSizesDto } from './dto/get-vm-sizes.dto';
 import { PaginatedVmSizesDto } from './dto/paginated-vm-sizes.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 @ApiBearerAuth('access-token')
 @UseGuards(AuthGuard('jwt'))
@@ -121,6 +123,35 @@ export class RequestController {
     } catch {
       console.error('Request Controller: Error decoding token');
       throw new Error('Invalid token - unable to process');
+    }
+  }
+
+  @Patch('/role')
+  @ApiOperation({
+    summary: 'Update user role by user ID',
+  })
+  updateRole(
+    @Body() roleUpdate: UpdateRoleDto,
+    @Request() req: RequestWithHeaders,
+  ) {
+    const token = extractToken(req);
+
+    try {
+      const user = jwt.decode(token) as BackendJwtPayload;
+
+      if (!user) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      if (user.role !== 'Admin' && user.role !== 'IT') {
+        throw new ForbiddenException(
+          'You do not have permission to update roles',
+        );
+      }
+
+      return this.requestService.updateRole(roleUpdate.id, roleUpdate.role);
+    } catch (error) {
+      throw new UnauthorizedException('Invalid token - unable to process');
     }
   }
 
