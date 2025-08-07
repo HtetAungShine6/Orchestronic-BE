@@ -170,11 +170,16 @@ export class RequestController {
   async updateRequestStatus(
     @Param('id') id: string,
     @Body() { status }: UpdateRequestStatusDto,
-    @Req() req: any,
+    @Req() req: RequestWithHeaders,
   ) {
-    const user = req.user;
+    const token = extractToken(req);
+    const user = jwt.decode(token) as BackendJwtPayload;
 
-    if (!user || (user.role !== 'Admin' && user.role !== 'IT')) {
+    if (!user) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    if (user.role !== 'Admin' && user.role !== 'IT') {
       throw new ForbiddenException(
         'You do not have permission to update status',
       );
