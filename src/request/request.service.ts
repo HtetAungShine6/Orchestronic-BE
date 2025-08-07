@@ -16,13 +16,24 @@ export class RequestService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async findAll(user: BackendJwtPayload) {
+    const whereClause =
+      user.role === Role.Admin || user.role === Role.IT
+        ? {}
+        : { ownerId: user.id };
+
     return await this.databaseService.request.findMany({
-      where: { ownerId: user.id },
+      where: whereClause,
       select: {
         id: true,
         displayCode: true,
         createdAt: true,
         status: true,
+        owner: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         resources: {
           select: {
             id: true,
@@ -186,8 +197,12 @@ export class RequestService {
     displayCode: string,
     user: BackendJwtPayload,
   ) {
+    const whereClause =
+      user.role === Role.Admin || user.role === Role.IT
+        ? { displayCode }
+        : { displayCode, ownerId: user.id };
     const request = await this.databaseService.request.findUnique({
-      where: { ownerId: user.id, displayCode },
+      where: whereClause,
       include: {
         resources: {
           include: {

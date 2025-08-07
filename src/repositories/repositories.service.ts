@@ -29,6 +29,16 @@ export class RepositoriesService {
         id: true,
         name: true,
         description: true,
+        request: {
+          select: {
+            owner: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
         RepositoryCollaborator: {
           select: {
             user: true,
