@@ -14,8 +14,26 @@ import { RepositoriesController } from './repositories/repositories.controller';
 import { RepositoriesService } from './repositories/repositories.service';
 import { AuthModule } from './auth/auth.module';
 import { ResourceModule } from './resource/resource.module';
+import { AirflowService } from './airflow/airflow.service';
+import { AirflowController } from './airflow/airflow.controller';
+import { RabbitmqService } from './rabbitmq/rabbitmq.service';
+import { RabbitmqController } from './rabbitmq/rabbitmq.controller';
+import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
+import { AirflowModule } from './airflow/airflow.module';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+
 @Module({
   imports: [
+    ClientsModule.register([
+      {
+        name: 'RABBITMQ_SERVICE',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://localhost:5672'],
+          queue: 'request',
+        },
+      },
+    ]),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'swagger-static'),
       serveRoot: process.env.NODE_ENV === 'development' ? '/' : '/swagger',
@@ -37,12 +55,22 @@ import { ResourceModule } from './resource/resource.module';
     RepositoriesModule,
     ResourceModule,
     AuthModule,
+    RabbitmqModule,
+    AirflowModule,
   ],
-  controllers: [AppController, UserController, RepositoriesController],
+  controllers: [
+    AppController,
+    UserController,
+    RepositoriesController,
+    AirflowController,
+    RabbitmqController,
+  ],
   providers: [
     // { provide: APP_GUARD, useClass: JwtAuthGuard },
     AppService,
     RepositoriesService,
+    AirflowService,
+    RabbitmqService,
   ],
 })
 export class AppModule {}
