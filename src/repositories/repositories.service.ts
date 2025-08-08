@@ -1,7 +1,6 @@
-import { Injectable, UseGuards } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateRepositoriesDto } from './dto/create-repository.dto';
-import { AuthGuard } from '@nestjs/passport';
 import { BackendJwtPayload } from '../lib/types';
 
 @Injectable()
@@ -26,11 +25,22 @@ export class RepositoriesService {
           in: repositoryIdList,
         },
       },
-      include: {
-        resources: true,
-        request: true,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        request: {
+          select: {
+            owner: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
         RepositoryCollaborator: {
-          include: {
+          select: {
             user: true,
           },
         },
@@ -90,6 +100,7 @@ export class RepositoriesService {
             numberOfCores: vm.numberOfCores,
             memory: vm.memory,
             os: vm.os,
+            sizeId: vm.sizeId,
           })),
         },
         dbs: {

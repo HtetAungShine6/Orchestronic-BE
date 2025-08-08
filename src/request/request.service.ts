@@ -9,7 +9,6 @@ import { Prisma, Status, Role } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ApiBody } from '@nestjs/swagger';
-import { Repository } from '@prisma/client';
 import { BackendJwtPayload } from '../lib/types';
 
 @Injectable()
@@ -17,22 +16,36 @@ export class RequestService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async findAll(user: BackendJwtPayload) {
+    const whereClause =
+      user.role === Role.Admin || user.role === Role.IT
+        ? {}
+        : { ownerId: user.id };
+
     return await this.databaseService.request.findMany({
-      where: { ownerId: user.id },
-      include: {
-        resources: {
-          include: {
-            resourceConfig: {
-              include: {
-                vms: true,
-                dbs: true,
-                sts: true,
-              },
-            },
+      where: whereClause,
+      select: {
+        id: true,
+        displayCode: true,
+        createdAt: true,
+        status: true,
+        owner: {
+          select: {
+            id: true,
+            name: true,
           },
         },
-        repository: true,
-        owner: true,
+        resources: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        repository: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   }
@@ -86,9 +99,21 @@ export class RequestService {
     // Create resourceConfig with VMs, DBs, STs
     const resourceConfig = await this.databaseService.resourceConfig.create({
       data: {
-        vms: { create: resources.resourceConfig.vms || [] },
-        dbs: { create: resources.resourceConfig.dbs || [] },
-        sts: { create: resources.resourceConfig.sts || [] },
+        vms: {
+          create: (resources.resourceConfig.vms || []).map((vm) => ({
+            name: vm.name,
+            numberOfCores: vm.numberOfCores,
+            memory: vm.memory,
+            os: vm.os,
+            sizeId: vm.sizeId,
+          })),
+        },
+        dbs: {
+          create: resources.resourceConfig.dbs || [],
+        },
+        sts: {
+          create: resources.resourceConfig.sts || [],
+        },
       },
     });
 
@@ -154,13 +179,6 @@ export class RequestService {
     return newRequest;
   }
 
-  async updateRole(id: string, role: Role) {
-    return this.databaseService.user.update({
-      where: { id },
-      data: { role },
-    });
-  }
-
   async updateRequestInfo(id: string, updateData: Prisma.RequestUpdateInput) {
     return this.databaseService.request.update({
       where: { id: id.toString() },
@@ -172,14 +190,22 @@ export class RequestService {
     displayCode: string,
     user: BackendJwtPayload,
   ) {
+    const whereClause =
+      user.role === Role.Admin || user.role === Role.IT
+        ? { displayCode }
+        : { displayCode, ownerId: user.id };
     const request = await this.databaseService.request.findUnique({
-      where: { ownerId: user.id, displayCode },
+      where: whereClause,
       include: {
         resources: {
           include: {
             resourceConfig: {
               include: {
-                vms: true,
+                vms: {
+                  include: {
+                    size: true,
+                  },
+                },
                 dbs: true,
                 sts: true,
               },
@@ -187,7 +213,9 @@ export class RequestService {
           },
         },
         repository: {
-          include: {
+          select: {
+            id: true,
+            name: true,
             RepositoryCollaborator: {
               include: {
                 user: true,
@@ -212,5 +240,114 @@ export class RequestService {
     return this.databaseService.request.delete({
       where: { id: id.toString() },
     });
+  }
+
+  async getVmSizes() {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return await (this.databaseService as any).azureVMSize.findMany();
+    } catch (error) {
+      console.error('Error fetching VM sizes:', error);
+      throw new InternalServerErrorException('Failed to fetch VM sizes');
+    }
+  }
+
+  async getVmSizesPaginated(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    minCores?: number;
+    maxCores?: number;
+    minMemory?: number;
+    maxMemory?: number;
+  }) {
+    try {
+      const {
+        page = 1,
+        limit = 20,
+        search,
+        minCores,
+        maxCores,
+        minMemory,
+        maxMemory,
+      } = params;
+
+      // Build the where clause for filtering
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const where: any = {};
+
+      if (search) {
+        where.name = {
+          contains: search,
+          mode: 'insensitive',
+        };
+      }
+
+      if (minCores !== undefined || maxCores !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const coresFilter: any = {};
+        if (minCores !== undefined) {
+          coresFilter.gte = minCores;
+        }
+        if (maxCores !== undefined) {
+          coresFilter.lte = maxCores;
+        }
+        where.numberOfCores = coresFilter;
+      }
+
+      if (minMemory !== undefined || maxMemory !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const memoryFilter: any = {};
+        if (minMemory !== undefined) {
+          memoryFilter.gte = minMemory;
+        }
+        if (maxMemory !== undefined) {
+          memoryFilter.lte = maxMemory;
+        }
+        where.memoryInMB = memoryFilter;
+      }
+
+      // Calculate offset
+      const skip = (page - 1) * limit;
+
+      // Get total count for pagination
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const total = await (this.databaseService as any).azureVMSize.count({
+        where,
+      });
+
+      // Get paginated data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await (this.databaseService as any).azureVMSize.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: [
+          { numberOfCores: 'asc' },
+          { memoryInMB: 'asc' },
+          { name: 'asc' },
+        ],
+      });
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNext,
+          hasPrev,
+        },
+      };
+    } catch (error) {
+      console.error('Error fetching VM sizes:', error);
+      throw new InternalServerErrorException('Failed to fetch VM sizes');
+    }
   }
 }

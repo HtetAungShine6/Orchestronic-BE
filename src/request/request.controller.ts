@@ -22,6 +22,7 @@ import {
   ApiBody,
   ApiOperation,
   ApiQuery,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -30,6 +31,8 @@ import { UpdateRequestStatusDto } from './dto/request-status.dto';
 import { BackendJwtPayload } from '../lib/types';
 import { RequestWithHeaders } from '../lib/types';
 import { extractToken } from '../lib/extract-token';
+import { GetVmSizesDto } from './dto/get-vm-sizes.dto';
+import { PaginatedVmSizesDto } from './dto/paginated-vm-sizes.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 
 @ApiBearerAuth('access-token')
@@ -55,6 +58,21 @@ export class RequestController {
   @ApiQuery({ name: 'status', enum: Status })
   findByStatus(@Query('status') status: Status) {
     return this.requestService.findByStatus(status);
+  }
+
+  @ApiOperation({
+    summary: 'Get available VM sizes',
+    description:
+      'Retrieves a list of available VM sizes from Azure with pagination and filtering',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'VM sizes retrieved successfully',
+    type: PaginatedVmSizesDto,
+  })
+  @Get('vm-sizes')
+  getVmSizes(@Query() query: GetVmSizesDto) {
+    return this.requestService.getVmSizesPaginated(query);
   }
 
   @Get('displayCode')
@@ -108,35 +126,6 @@ export class RequestController {
     }
   }
 
-  @Patch('/role')
-  @ApiOperation({
-    summary: 'Update user role by user ID',
-  })
-  updateRole(
-    @Body() roleUpdate: UpdateRoleDto,
-    @Request() req: RequestWithHeaders,
-  ) {
-    const token = extractToken(req);
-
-    try {
-      const user = jwt.decode(token) as BackendJwtPayload;
-
-      if (!user) {
-        throw new UnauthorizedException('User not authenticated');
-      }
-
-      if (user.role !== 'Admin' && user.role !== 'IT') {
-        throw new ForbiddenException(
-          'You do not have permission to update roles',
-        );
-      }
-
-      return this.requestService.updateRole(roleUpdate.id, roleUpdate.role);
-    } catch (error) {
-      throw new UnauthorizedException('Invalid token - unable to process');
-    }
-  }
-
   @Patch(':id')
   updateRequestInfo(
     @Param('id') id: string,
@@ -152,11 +141,16 @@ export class RequestController {
   async updateRequestStatus(
     @Param('id') id: string,
     @Body() { status }: UpdateRequestStatusDto,
-    @Req() req: any,
+    @Req() req: RequestWithHeaders,
   ) {
-    const user = req.user;
+    const token = extractToken(req);
+    const user = jwt.decode(token) as BackendJwtPayload;
 
-    if (!user || (user.role !== 'Admin' && user.role !== 'IT')) {
+    if (!user) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    if (user.role !== 'Admin' && user.role !== 'IT') {
       throw new ForbiddenException(
         'You do not have permission to update status',
       );

@@ -9,6 +9,6 @@ export enum RequestStatus {
 }
 export class UpdateRequestStatusDto {
   @ApiProperty({ enum: RequestStatus })
-  @IsEnum(RequestStatus, { message: 'status must be APPROVED or REJECTED' })
+  @IsEnum(RequestStatus, { message: 'status must be Approved or Rejected' })
   status: RequestStatus;
 }
