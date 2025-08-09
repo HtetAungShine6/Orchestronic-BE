@@ -19,7 +19,7 @@ model Request {
   displayCode String @unique
   status      Status @default(Pending)
   description String
-
+  feedback   String?
   owner   User   @relation(fields: [ownerId], references: [id])
   ownerId String
 

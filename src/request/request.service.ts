@@ -10,6 +10,7 @@ import { DatabaseService } from '../database/database.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ApiBody } from '@nestjs/swagger';
 import { BackendJwtPayload } from '../lib/types';
+import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 
 @Injectable()
 export class RequestService {
@@ -183,6 +184,13 @@ export class RequestService {
     return this.databaseService.request.update({
       where: { id: id.toString() },
       data: updateData,
+    });
+  }
+
+  async updateRequestFeedback(id: string, feedback?: string) {
+    return this.databaseService.request.update({
+      where: { id },
+      data: { feedback: feedback || null },
     });
   }
 

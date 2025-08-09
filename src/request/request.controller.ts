@@ -34,6 +34,7 @@ import { extractToken } from '../lib/extract-token';
 import { GetVmSizesDto } from './dto/get-vm-sizes.dto';
 import { PaginatedVmSizesDto } from './dto/paginated-vm-sizes.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 
 @ApiBearerAuth('access-token')
 @UseGuards(AuthGuard('jwt'))
@@ -164,6 +165,37 @@ export class RequestController {
     }
 
     return updated;
+  }
+
+  @Patch(':id/feedback')
+  @ApiOperation({
+    summary: 'Update request feedback by request ID',
+  })
+  async updateRequestFeedback(
+    @Param('id') id: string,
+    @Body() feedback: UpdateFeedbackDto,
+    @Req() req: RequestWithHeaders,
+  ) {
+    const token = extractToken(req);
+
+    try {
+      const decoded = jwt.decode(token) as BackendJwtPayload;
+
+      if (!decoded) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      if (decoded.role !== 'Admin' && decoded.role !== 'IT') {
+        throw new ForbiddenException(
+          'You do not have permission to update feedback',
+        );
+      }
+
+      return this.requestService.updateRequestFeedback(id, feedback.feedback);
+    } catch (error) {
+      console.error('Request Controller: Error decoding token', error);
+      throw new UnauthorizedException('Invalid token - unable to process');
+    }
   }
 
   @Delete(':id')
