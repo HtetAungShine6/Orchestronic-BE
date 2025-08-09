@@ -118,6 +118,7 @@ model User {
   UserRepository         ownedRepository[]
   RepositoryCollaborator RepositoryCollaborator[]
   RefreshToken           RefreshToken[]
+  CloudResourceSecret CloudResourceSecret[]
 }
 
 enum RepositoryStatus {
@@ -164,6 +165,7 @@ model CloudResourceSecret {
   subscriptionId String        @unique
   tenantId       String?
   userId         String
+  user         User          @relation(fields: [userId], references: [id])
   cloudProvider  CloudProvider
 }
 
