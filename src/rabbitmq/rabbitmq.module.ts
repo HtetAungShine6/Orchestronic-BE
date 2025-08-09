@@ -1,4 +1,3 @@
-import { r } from '@faker-js/faker/dist/airline-BUL6NtOJ';
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { RabbitmqController } from './rabbitmq.controller';
