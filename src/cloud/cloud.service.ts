@@ -26,9 +26,9 @@ export class CloudService {
       data: {
         ...secretData,
         cloudProvider:
-          CloudProvider[
-            secretData.cloudProvider.toUpperCase() as keyof typeof CloudProvider
-          ],
+          secretData.cloudProvider === CloudProvider.AZURE
+            ? CloudProvider.AZURE
+            : CloudProvider.AWS,
         userId: user.id,
       },
     });
