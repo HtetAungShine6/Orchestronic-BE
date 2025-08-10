@@ -180,6 +180,23 @@ model AzureVMSize {
   VMInstance           VMInstance[]
 }
 
+model PolicyVM {
+  id          String @id @default(uuid())
+  name        String @unique
+  noOfCores Int
+  memory Int
+}
+
+model PolicyDatabase {
+  id          String @id @default(uuid())
+  maxStorage   Int
+}
+
+model PolicyStorage {
+  id          String @id @default(uuid())
+  maxStorage  Int
+}
+
 enum CloudProvider {
   AWS
   AZURE

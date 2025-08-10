@@ -42,6 +42,9 @@ export class RequestController {
   constructor(private readonly requestService: RequestService) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Find all requests for the authenticated user',
+  })
   findAll(@Request() req: RequestWithHeaders) {
     const token = extractToken(req);
 
@@ -55,6 +58,9 @@ export class RequestController {
   }
 
   @Get('status')
+  @ApiOperation({
+    summary: 'Find requests by status',
+  })
   @ApiQuery({ name: 'status', enum: Status })
   findByStatus(@Query('status') status: Status) {
     return this.requestService.findByStatus(status);
@@ -71,11 +77,17 @@ export class RequestController {
     type: PaginatedVmSizesDto,
   })
   @Get('vm-sizes')
+  @ApiOperation({
+    summary: 'Get available VM sizes with pagination and filtering',
+  })
   getVmSizes(@Query() query: GetVmSizesDto) {
     return this.requestService.getVmSizesPaginated(query);
   }
 
   @Get('displayCode')
+  @ApiOperation({
+    summary: 'Find requests by display code',
+  })
   @ApiQuery({
     name: 'displayCode',
     description: 'Format: R-[number]',
@@ -106,11 +118,17 @@ export class RequestController {
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Find a request by ID',
+  })
   findById(@Param('id') id: string) {
     return this.requestService.findById(+id);
   }
 
   @Post()
+  @ApiOperation({
+    summary: 'Create a new request',
+  })
   @ApiBody({ type: CreateRequestDto })
   async createRequest(
     @Request() req: RequestWithHeaders,
@@ -127,6 +145,9 @@ export class RequestController {
   }
 
   @Patch(':id')
+  @ApiOperation({
+    summary: 'Update request information by request ID',
+  })
   updateRequestInfo(
     @Param('id') id: string,
     @Body() requestUpdate: Prisma.RequestUpdateInput,
@@ -198,6 +219,9 @@ export class RequestController {
   }
 
   @Delete(':id')
+  @ApiOperation({
+    summary: 'Delete a request by ID',
+  })
   removeRequest(@Param('id') id: string) {
     return this.requestService.removeRequest(+id);
   }

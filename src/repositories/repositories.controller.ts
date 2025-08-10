@@ -3,7 +3,7 @@ import { Get, Query, Post, Body, Request } from '@nestjs/common';
 import { RepositoriesService } from './repositories.service';
 import { CreateRepositoriesDto } from './dto/create-repository.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BackendJwtPayload, RequestWithHeaders } from '../lib/types';
 import * as jwt from 'jsonwebtoken';
 import { extractToken } from '../lib/extract-token';
@@ -13,18 +13,29 @@ export class RepositoriesController {
   constructor(private readonly repositoriesService: RepositoriesService) {}
 
   @Get('available-repository')
+  @ApiOperation({
+    summary: 'Find available repositories by name',
+  })
   findByName(@Query('name') name: string) {
     return this.repositoriesService.findByName(name);
   }
+
   @ApiBearerAuth('access-token')
   @UseGuards(AuthGuard('jwt'))
   @Post()
+  @ApiOperation({
+    summary: 'Create a new repository',
+  })
   createRepository(@Body() repository: CreateRepositoriesDto) {
     return this.repositoriesService.createRepository(repository);
   }
+
   @ApiBearerAuth('access-token')
   @UseGuards(AuthGuard('jwt'))
   @Get()
+  @ApiOperation({
+    summary: 'Find all repositories for the authenticated user',
+  })
   findAll(@Request() req: RequestWithHeaders) {
     const token = extractToken(req);
 

@@ -113,6 +113,9 @@ export class UserController {
   }
 
   @Get('fuzzy-find-by-email')
+  @ApiOperation({
+    summary: 'Fuzzy find users by email',
+  })
   async fuzzyFindUsersByEmail(
     @Query() query: FindUserByEmailDto,
   ): Promise<UserResponseDto[]> {

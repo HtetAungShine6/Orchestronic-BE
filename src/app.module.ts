@@ -22,6 +22,9 @@ import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import { AirflowModule } from './airflow/airflow.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { CloudModule } from './cloud/cloud.module';
+import { PolicyService } from './policy/policy.service';
+import { PolicyController } from './policy/policy.controller';
+import { PolicyModule } from './policy/policy.module';
 
 @Module({
   imports: [
@@ -59,6 +62,7 @@ import { CloudModule } from './cloud/cloud.module';
     RabbitmqModule,
     AirflowModule,
     CloudModule,
+    PolicyModule,
   ],
   controllers: [
     AppController,
@@ -66,6 +70,7 @@ import { CloudModule } from './cloud/cloud.module';
     RepositoriesController,
     AirflowController,
     RabbitmqController,
+    PolicyController,
   ],
   providers: [
     // { provide: APP_GUARD, useClass: JwtAuthGuard },
@@ -73,6 +78,7 @@ import { CloudModule } from './cloud/cloud.module';
     RepositoriesService,
     AirflowService,
     RabbitmqService,
+    PolicyService,
   ],
 })
 export class AppModule {}

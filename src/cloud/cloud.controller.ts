@@ -13,7 +13,7 @@ import { RequestWithHeaders } from '../lib/types';
 import { extractToken } from '../lib/extract-token';
 import * as jwt from 'jsonwebtoken';
 import { BackendJwtPayload } from '../lib/types';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
@@ -23,6 +23,9 @@ export class CloudController {
   constructor(private readonly cloudService: CloudService) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Get cloud data',
+  })
   getCloudData(@Request() req: RequestWithHeaders) {
     const token = extractToken(req);
 
@@ -41,6 +44,9 @@ export class CloudController {
   }
 
   @Post('secret')
+  @ApiOperation({
+    summary: 'Create a new secret',
+  })
   createSecret(
     @Body() secretData: SecretDto,
     @Request() req: RequestWithHeaders,
