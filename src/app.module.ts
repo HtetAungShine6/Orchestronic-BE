@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RequestModule } from './request/request.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from './database/database.module';
 import { UserController } from './user/user.controller';
@@ -25,9 +25,25 @@ import { CloudModule } from './cloud/cloud.module';
 import { PolicyService } from './policy/policy.service';
 import { PolicyController } from './policy/policy.controller';
 import { PolicyModule } from './policy/policy.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    HttpModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        baseURL:
+          config.get<string>('AIRFLOW_BASE_URL') ?? 'http://localhost:8080',
+        auth: {
+          username: config.get<string>('AIRFLOW_USERNAME') ?? '',
+          password: config.get<string>('AIRFLOW_PASSWORD') ?? '',
+        },
+        timeout: 15000,
+      }),
+    }),
+
     ClientsModule.register([
       {
         name: 'RABBITMQ_SERVICE',
