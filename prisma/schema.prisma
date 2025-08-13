@@ -164,8 +164,8 @@ model CloudResourceSecret {
   clientSecret   String
   subscriptionId String        @unique
   tenantId       String?
-  User           User?         @relation(fields: [userId], references: [id])
-  userId         String?
+  User           User          @relation(fields: [userId], references: [id])
+  userId         String
   cloudProvider  CloudProvider
 }
 
