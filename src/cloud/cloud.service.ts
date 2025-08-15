@@ -11,14 +11,6 @@ export class CloudService {
   async getSecretById(user: BackendJwtPayload, cloudProvider: CloudProvider) {
     const result = await this.databaseService.cloudResourceSecret.findFirst({
       where: { userId: user.id, cloudProvider },
-      select: {
-        clientId: true,
-        clientSecret: true,
-        subscriptionId: true,
-        tenantId: true,
-        cloudProvider: true,
-        userId: true,
-      },
     });
 
     return result ?? [];
