@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CreateGitlabDto } from './dto/create-gitlab.dto';
 import { UpdateGitlabDto } from './dto/update-gitlab.dto';
+import fetch from 'node-fetch';
 
 @Injectable()
 export class GitlabService {
