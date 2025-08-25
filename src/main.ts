@@ -4,12 +4,12 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 // import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { ValidationPipe } from '@nestjs/common';
 // import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-// import * as cookieParser from 'cookie-parser';
+import * as cookieParser from 'cookie-parser';
 import * as session from 'express-session';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  // app.use(cookieParser()); // 👈 add this
+  app.use(cookieParser()); // 👈 add this
 
   app.use(
     session({
@@ -21,10 +21,8 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: '*',
-    methods: '*',
-    credentials: true,
-    allowedHeaders: '*',
+    origin: 'http://localhost:3000',
+    credentials: true, // allow cookies
   });
 
   app.useGlobalPipes(new ValidationPipe());
