@@ -4,9 +4,15 @@ import { RequestService } from './request.service';
 import { DatabaseModule } from '../database/database.module';
 import { GitlabService } from 'src/gitlab/gitlab.service';
 import { RepositoriesService } from 'src/repositories/repositories.service';
+import { PassportModule } from '@nestjs/passport';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [
+    DatabaseModule,
+    PassportModule.register({
+      defaultStrategy: 'AzureAD',
+    }),
+  ],
   controllers: [RequestController],
   providers: [RequestService, GitlabService, RepositoriesService],
 })

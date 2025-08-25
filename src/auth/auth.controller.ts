@@ -1,77 +1,61 @@
-import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
-import { AzureTokenService } from './azure-token.service';
-import { ShortTokenService } from './short-token.service';
-import { UserService } from '../user/user.service';
-import { RequestService } from '../request/request.service';
-import {
-  AuthExchangeDto,
-  AuthExchangeResponseDto,
-} from './dto/auth-exchange.dto';
-import { Public } from './public.decorator';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
+import { JwtService } from '@nestjs/jwt';
 
-@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private azureTokenService: AzureTokenService,
-    private shortTokenService: ShortTokenService,
-    private userService: UserService,
-  ) {}
+  constructor(private jwt: JwtService) {}
 
-  @Public()
-  @Post('exchange')
-  @ApiOperation({
-    summary: 'Exchange Azure AD token for backend tokens',
-    description:
-      'Exchanges a valid Azure AD token for backend access and refresh tokens',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Successfully exchanged tokens',
-    type: AuthExchangeResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid Azure token or user not found',
-  })
-  async exchangeToken(
-    @Body() authDto: AuthExchangeDto,
-  ): Promise<AuthExchangeResponseDto> {
-    if (!authDto) throw new BadRequestException('Azure token is required');
+  @Get('azure')
+  @UseGuards(AuthGuard('azure-ad'))
+  async azureLogin() {
+    // passport redirect to Azure
+  }
 
-    const payload = await this.azureTokenService.verifyAzureToken(
-      authDto.azureToken,
-    );
+  @Get('azure/callback')
+  @UseGuards(AuthGuard('azure-ad'))
+  azureCallback(@Req() req, @Res() res: Response) {
+    console.log('Req.user:', req.user);
+    const user = req.user;
 
-    if (!payload) {
-      throw new BadRequestException('Invalid Azure token');
-    }
+    // Issue short-lived JWT
+    const accessToken = this.jwt.sign({ ...user }, { expiresIn: '1h' });
 
-    // Extract user info from Azure token payload
-    const userId = payload.oid;
-    const email = payload.upn;
+    // Issue refresh token (store in DB or cache with expiration)
+    const refreshToken = this.jwt.sign({ sub: user.id }, { expiresIn: '7d' });
 
-    if (!userId || !email) {
-      throw new BadRequestException('Invalid Azure token payload');
-    }
-
-    const user = await this.userService.findByEmail(email);
-
-    if (!user) {
-      throw new BadRequestException('User not found');
-    }
-
-    // Create your own short token with minimal info
-    const shortToken = this.shortTokenService.createTokens({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+    // Set refresh token as HTTP-only cookie
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
     });
 
-    return {
-      accessToken: shortToken.accessToken,
-    };
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/auth/callback?accessToken=${accessToken}`,
+    );
+  }
+
+  @Post('refresh')
+  refresh(@Req() req: any, @Res() res: Response) {
+    const refreshToken = req.cookies['refresh_token'];
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'No refresh token' });
+    }
+
+    try {
+      const payload = this.jwt.verify(refreshToken);
+
+      // Issue new short-lived access token
+      const accessToken = this.jwt.sign(
+        { sub: payload.sub },
+        { expiresIn: '1h' },
+      );
+
+      return res.json({ accessToken });
+    } catch {
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
   }
 }

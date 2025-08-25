@@ -7,11 +7,17 @@ import { AuthService } from './auth.service';
 import { ShortTokenService } from './short-token.service';
 import { AuthController } from './auth.controller';
 import { AzureTokenService } from './azure-token.service';
+import { PassportModule } from '@nestjs/passport';
+import { AzureStrategy } from './strategies/azure-ad.strategy';
 
 @Module({
   imports: [
+    PassportModule.register({
+      defaultStrategy: 'azure-ad',
+    }),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: '1h' },
     }),
     UserModule,
   ],
@@ -21,6 +27,8 @@ import { AzureTokenService } from './azure-token.service';
     DatabaseService,
     ShortTokenService,
     AzureTokenService,
+    DatabaseService,
+    AzureStrategy,
   ],
   controllers: [AuthController],
   exports: [JwtStrategy],
