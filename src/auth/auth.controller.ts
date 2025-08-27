@@ -23,6 +23,7 @@ export class AuthController {
       secure: isProd, // for Postman / localhost
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 60 * 60 * 1000,
+      domain: 'orchestronic-frontend.vercel.app',
     });
 
     res.cookie('refresh_token', refreshToken, {
@@ -30,6 +31,7 @@ export class AuthController {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
+      domain: 'orchestronic-frontend.vercel.app',
     });
 
     return res.json({ message: 'Cookies set' });
@@ -61,6 +63,7 @@ export class AuthController {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 60 * 60 * 1000, // 1 hour
+      domain: 'orchestronic-frontend.vercel.app',
     });
 
     res.cookie('refresh_token', refreshToken, {
@@ -68,6 +71,7 @@ export class AuthController {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      domain: 'orchestronic-frontend.vercel.app',
     });
 
     // Redirect to frontend
@@ -104,6 +108,7 @@ export class AuthController {
         secure: isProd,
         sameSite: isProd ? 'none' : 'lax',
         maxAge: 60 * 60 * 1000, // 1 hour
+        domain: 'orchestronic-frontend.vercel.app',
       });
 
       return res.json({ accessToken });
@@ -120,11 +125,13 @@ export class AuthController {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
+      domain: 'orchestronic-frontend.vercel.app',
     });
     res.clearCookie('access_token', {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
+      domain: 'orchestronic-frontend.vercel.app',
     });
     return { message: 'Logged out' };
   }
