@@ -172,6 +172,15 @@ model PolicyStorage {
   cloudProvider CloudProvider @unique
 }
 
+model AwsInstanceType {
+  id        String   @id @map("InstanceType")
+  region    String
+  raw       Json
+  core      Int
+  ram       Int
+  createdAt DateTime @default(now())
+}
+
 enum RepositoryStatus {
   Created
   Pending
