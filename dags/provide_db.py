@@ -23,35 +23,36 @@ default_args = {
 # -------------------------
 import pika, json
 
-def rabbitmq_consumer():
-    load_dotenv(expanduser('/opt/airflow/dags/.env'))
-    rabbit_url = os.getenv("RABBITMQ_URL")
-    rabbit_url = "amqp://guest:guest@host.docker.internal:5672"
-    if not rabbit_url:
-        raise ValueError("RABBITMQ_URL is not set in .env")
+# def rabbitmq_consumer():
+#     load_dotenv(expanduser('/opt/airflow/dags/.env'))
+#     rabbit_url = os.getenv("RABBITMQ_URL")
+#     rabbit_url = "amqp://guest:guest@host.docker.internal:5672"
+#     if not rabbit_url:
+#         raise ValueError("RABBITMQ_URL is not set in .env")
 
-    connection = pika.BlockingConnection(pika.URLParameters(rabbit_url))
-    channel = connection.channel()
+#     connection = pika.BlockingConnection(pika.URLParameters(rabbit_url))
+#     channel = connection.channel()
 
-    method_frame, header_frame, body = channel.basic_get(queue='request', auto_ack=True)
-    if method_frame:
-        message = body.decode()
-        obj = json.loads(message)
-        request_id = obj["data"]["requestId"]
-        print(f"[x] Got message: {request_id}")
-        connection.close()
-        return request_id
-    else:
-        print("[x] No message in queue")
-        connection.close()
-        return None
+#     method_frame, header_frame, body = channel.basic_get(queue='request', auto_ack=True)
+#     if method_frame:
+#         message = body.decode()
+#         obj = json.loads(message)
+#         request_id = obj["data"]["requestId"]
+#         print(f"[x] Got message: {request_id}")
+#         connection.close()
+#         return request_id
+#     else:
+#         print("[x] No message in queue")
+#         connection.close()
+#         return None
 
 # -------------------------
 # Step 2: Fetch from Supabase
 # -------------------------
 import psycopg2
 
-def fetch_from_database(request_id):
+def fetch_from_database(**context):
+    request_id = context['dag_run'].conf.get('request_id')
     if not request_id:
         raise ValueError("No message received from RabbitMQ. Stop DAG run.")
 
@@ -140,6 +141,7 @@ def write_terraform_db_files(terraform_dir, configInfo):
     config_dict = ast.literal_eval(configInfo)
     db_keys = ["id", "storageGB", "resourceConfigId", "name", "password", "skuName", "username", "engine"]
 
+    projectName = f"rg-{config_dict['repoName']}-{config_dict['resourcesId'][:4]}"
 
     def to_map(instance, keys):
         if not instance:
@@ -166,6 +168,7 @@ def write_terraform_db_files(terraform_dir, configInfo):
         client_secret        = "{os.getenv('AZURE_CLIENT_SECRET')}"
         tenant_id            = "{os.getenv('AZURE_TENANT_ID')}"
         project_location     = "{config_dict['region']}"
+        repoName             = "{config_dict['repoName'] + '-' + config_dict['resourcesId'][:4]}"
         database_resources   = {json.dumps(database_resources, indent=4)}
     """
     tfvars_file = os.path.join(terraform_dir, f"{config_dict['repoName']}-db.auto.tfvars")
@@ -177,14 +180,34 @@ def write_terraform_db_files(terraform_dir, configInfo):
     # -------------------------
     # variables.tf
     # -------------------------
-    variables_tf_content = """
-        variable "subscription_id" {}
-        variable "client_id" {}
-        variable "client_secret" {}
-        variable "tenant_id" {}
-        variable "project_location" {}
-        variable "database_resources" { type = list(map(any)) }
+    load_dotenv(expanduser('/opt/airflow/dags/.env'))
+
+    variables_tf_content = f"""
+        variable "subscription_id" {{
+        default = "{os.getenv('AZURE_SUBSCRIPTION_ID')}"
+        }}
+
+        variable "client_id" {{
+        default = "{os.getenv('AZURE_CLIENT_ID')}"
+        }}
+
+        variable "client_secret" {{
+        default = "{os.getenv('AZURE_CLIENT_SECRET')}"
+        }}
+
+        variable "tenant_id" {{
+        default = "{os.getenv('AZURE_TENANT_ID')}"
+        }}
+
+        variable "project_location" {{
+        default = "{config_dict['region']}"
+        }}
+
+        variable "db_resources" {{
+        type = list(map(any))
+        }}
     """
+
     variables_file = os.path.join(terraform_dir, f"{config_dict['repoName']}-db.variables.tf")
     if not os.path.exists(variables_file):
         with open(variables_file, "w") as f:
@@ -214,20 +237,14 @@ def write_terraform_db_files(terraform_dir, configInfo):
         tenant_id       = var.tenant_id
         }}
 
-        # Conditional Resource Group
-        data "azurerm_resource_group" "existing" {{
-        name = "{config_dict['repoName']}"
-        }}
-
         resource "azurerm_resource_group" "rg" {{
-        count    = length(data.azurerm_resource_group.existing.*.name) == 0 ? 1 : 0
-        name     = "{config_dict['repoName']}"
+        name     = "{projectName}"
         location = var.project_location
         }}
 
         locals {{
-        rg_name     = length(data.azurerm_resource_group.existing.*.name) > 0 ? data.azurerm_resource_group.existing.name : azurerm_resource_group.rg[0].name
-        rg_location = length(data.azurerm_resource_group.existing.*.name) > 0 ? data.azurerm_resource_group.existing.location : azurerm_resource_group.rg[0].location
+        rg_name     = azurerm_resource_group.rg.name
+        rg_location = azurerm_resource_group.rg.location
         }}
 
         # PostgreSQL Flexible Server
@@ -291,16 +308,15 @@ with DAG(
     max_active_runs=5,
 ) as dag:
 
-    consume_task = PythonOperator(
-        task_id="consume_rabbitmq",
-        python_callable=rabbitmq_consumer,
-        execution_timeout=timedelta(seconds=15),
-    )
+    # consume_task = PythonOperator(
+    #     task_id="consume_rabbitmq",
+    #     python_callable=rabbitmq_consumer,
+    #     execution_timeout=timedelta(seconds=15),
+    # )
 
     fetch_task = PythonOperator(
         task_id="fetch_config",
-        python_callable=fetch_from_database,
-        op_args=["{{ ti.xcom_pull(task_ids='consume_rabbitmq') }}"],
+        python_callable=fetch_from_database
     )
 
     create_dir_task = PythonOperator(
@@ -322,11 +338,24 @@ with DAG(
         bash_command="cd {{ ti.xcom_pull(task_ids='create_terraform_dir') }} && set -e && terraform init",
     )
 
+    # Import RG if exists in Azure
+    terraform_import = BashOperator(
+        task_id="terraform_import_rg",
+        bash_command=(
+            "cd {{ ti.xcom_pull(task_ids='create_terraform_dir') }} && "
+            "terraform import -no-color "
+            "azurerm_resource_group.rg "
+            '"/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-{{ ti.xcom_pull(task_ids=\'fetch_config\')[\'repoName\'] }}-{{ ti.xcom_pull(task_ids=\'fetch_config\')[\'resourcesId\'][:4] }}" || true'
+        ),
+        env={
+            "AZURE_SUBSCRIPTION_ID": os.getenv("AZURE_SUBSCRIPTION_ID", ""),
+        }
+    )
+
     # Terraform Apply
     terraform_apply = BashOperator(
         task_id="terraform_apply",
         bash_command="cd {{ ti.xcom_pull(task_ids='create_terraform_dir') }} && set -e && terraform apply -auto-approve",
     )
 
-
-    consume_task >> fetch_task >> create_dir_task >> write_files_task >> terraform_init >> terraform_apply
+    fetch_task >> create_dir_task >> write_files_task >> terraform_init >> terraform_import >> terraform_apply

@@ -27,30 +27,31 @@ default_args = {
 # -------------------------
 # Step 1: RabbitMQ Consumer
 # -------------------------
-def rabbitmq_consumer():
-    load_dotenv(expanduser('/opt/airflow/dags/.env'))
-    rabbit_url = "amqp://guest:guest@host.docker.internal:5672"
+# def rabbitmq_consumer():
+#     load_dotenv(expanduser('/opt/airflow/dags/.env'))
+#     rabbit_url = "amqp://guest:guest@host.docker.internal:5672"
 
-    connection = pika.BlockingConnection(pika.URLParameters(rabbit_url))
-    channel = connection.channel()
+#     connection = pika.BlockingConnection(pika.URLParameters(rabbit_url))
+#     channel = connection.channel()
 
-    method_frame, _, body = channel.basic_get(queue='request', auto_ack=True)
-    if method_frame:
-        message = body.decode()
-        obj = json.loads(message)
-        request_id = obj["data"]["requestId"]
-        print(f"[x] Got message: {request_id}")
-        connection.close()
-        return request_id
-    else:
-        print("[x] No message in queue")
-        connection.close()
-        return None
+#     method_frame, _, body = channel.basic_get(queue='request', auto_ack=True)
+#     if method_frame:
+#         message = body.decode()
+#         obj = json.loads(message)
+#         request_id = obj["data"]["requestId"]
+#         print(f"[x] Got message: {request_id}")
+#         connection.close()
+#         return request_id
+#     else:
+#         print("[x] No message in queue")
+#         connection.close()
+#         return None
 
 # -------------------------
 # Step 2: Fetch from Supabase
 # -------------------------
-def fetch_from_database(request_id):
+def fetch_from_database(**context):
+    request_id = context['dag_run'].conf.get('request_id')
     if not request_id:
         raise ValueError("No message received from RabbitMQ. Stop DAG run.")
 
@@ -326,15 +327,14 @@ with DAG(
     catchup=False,
 ) as dag:
 
-    consume_task = PythonOperator(
-        task_id="consume_rabbitmq",
-        python_callable=rabbitmq_consumer,
-    )
+    # consume_task = PythonOperator(
+    #     task_id="consume_rabbitmq",
+    #     python_callable=rabbitmq_consumer,
+    # )
 
     fetch_task = PythonOperator(
         task_id="fetch_config",
         python_callable=fetch_from_database,
-        op_args=["{{ ti.xcom_pull(task_ids='consume_rabbitmq') }}"],
     )
 
     create_dir_task = PythonOperator(
@@ -386,4 +386,4 @@ with DAG(
         bash_command="cd {{ ti.xcom_pull(task_ids='create_terraform_dir') }} && terraform apply -auto-approve",
     )
 
-    consume_task >> fetch_task >> create_dir_task >> generate_ssh_task >> write_files_task >> terraform_init >> terraform_import >> terraform_apply
+    fetch_task >> create_dir_task >> generate_ssh_task >> write_files_task >> terraform_init >> terraform_import >> terraform_apply
