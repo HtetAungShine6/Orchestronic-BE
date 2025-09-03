@@ -15,6 +15,7 @@ import { BackendJwtPayload } from '../lib/types';
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import { AirflowService } from '../airflow/airflow.service';
 import { RequestStatus } from './dto/request-status.dto';
+import { da } from '@faker-js/faker/.';
 
 @Injectable()
 export class RequestService {
@@ -228,18 +229,33 @@ export class RequestService {
         },
       });
 
-      // let maxIteration = 0;
-      // if (
-      //   (findNumberOfVM && findNumberOfVM > 0) ||
-      //   (findNumberOfDB && findNumberOfDB > 0) ||
-      //   (findNumberOfST && findNumberOfST > 0)
-      // ) {
-      //   maxIteration = 3
-      // } else if (
+      console.log('Number of VMs:', findNumberOfVM);
+      console.log('Number of DBs:', findNumberOfDB);
+      console.log('Number of STs:', findNumberOfST);
+      let maxIteration = 0;
+      let dagId: string[] = [];
 
       // TODO: condition to assign how many times the loop will run according to the number of resources requested
-      await this.rabbitmqService.queueRequest(id.toString());
-      await this.airflowService.triggerDag(user, 'terraform_vm_provision');
+      if (findNumberOfVM && findNumberOfVM > 0) {
+        maxIteration += 1;
+        dagId.push('terraform_vm_provision');
+      }
+
+      if (findNumberOfDB && findNumberOfDB > 0) {
+        maxIteration += 1;
+        dagId.push('terraform_db_provision');
+      }
+
+      if (findNumberOfST && findNumberOfST > 0) {
+        maxIteration += 1;
+        dagId.push('terraform_st_provision');
+      }
+
+      for (let i = 0; i < maxIteration; i++) {
+        console.log('Iteration number: ', i + 1);
+        await this.rabbitmqService.queueRequest(id.toString());
+        await this.airflowService.triggerDag(user, dagId[i]);
+      }
     }
     return updateStatus;
   }
