@@ -1,12 +1,10 @@
-import ast
 import os
 import json
-import pika
 import psycopg2
 from dotenv import load_dotenv
 from os.path import expanduser
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 

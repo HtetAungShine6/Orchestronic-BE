@@ -2,11 +2,9 @@ import ast
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
-from pathlib import Path
 from dotenv import load_dotenv
-from os.path import expanduser
 
 # -------------------------
 # Default DAG args
@@ -21,7 +19,6 @@ default_args = {
 # -------------------------
 # Step 1: RabbitMQ Consumer
 # -------------------------
-import pika, json
 
 # def rabbitmq_consumer():
 #     load_dotenv(expanduser('/opt/airflow/dags/.env'))
