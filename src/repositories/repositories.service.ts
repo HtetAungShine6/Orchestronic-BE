@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { CreateRepositoriesDto } from './dto/create-repository.dto';
+import { CreateAzureRepositoriesDto } from './dto/create-azure-repository.dto';
 import { BackendJwtPayload } from '../lib/types';
 import { CloudProvider, RepositoryStatus, Role } from '@prisma/client';
+import { CreateAwsRepositoriesDto } from './dto/create-aws-repository.dto';
 
 @Injectable()
 export class RepositoriesService {
@@ -77,7 +78,9 @@ export class RepositoriesService {
     };
   }
 
-  async createRepository(dto: CreateRepositoriesDto) {
+  async createRepositoryAws(dto: CreateAwsRepositoriesDto) {}
+
+  async createRepositoryAzure(dto: CreateAzureRepositoriesDto) {
     const { resources, ...repository } = dto;
 
     const existingRepository = await this.findByName(repository.name);
@@ -106,7 +109,7 @@ export class RepositoriesService {
 
     const newResourceConfig = await this.databaseService.resourceConfig.create({
       data: {
-        vms: {
+        AzureVMInstance: {
           create: resources.resourceConfig.vms.map((vm) => ({
             name: vm.name,
             numberOfCores: vm.numberOfCores,
@@ -115,13 +118,13 @@ export class RepositoriesService {
             sizeId: vm.sizeId,
           })),
         },
-        dbs: {
+        AzureDatabase: {
           create: resources.resourceConfig.dbs.map((db) => ({
             engine: db.engine,
             storageGB: db.storageGB,
           })),
         },
-        sts: {
+        AzureStorage: {
           create: resources.resourceConfig.sts.map((st) => ({
             name: st.name,
             sku: st.sku,

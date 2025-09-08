@@ -7,13 +7,14 @@ import {
 } from '@nestjs/common';
 import { Prisma, Status, Role, CloudProvider } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
-import { CreateRequestDto } from './dto/create-request.dto';
+import { CreateAzureRequestDto } from './dto/create-request-azure.dto';
 import { ApiBody } from '@nestjs/swagger';
 import { BackendJwtPayload } from '../lib/types';
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import { AirflowService } from '../airflow/airflow.service';
 import { RequestStatus } from './dto/request-status.dto';
-import { da } from '@faker-js/faker/.';
+import { CreateAwsResourceDto } from 'src/resource/dto/create-aws-resource.dto';
+import { CreateAwsRequestDto } from './dto/create-request-aws.dto';
 
 @Injectable()
 export class RequestService {
@@ -70,8 +71,11 @@ export class RequestService {
     });
   }
 
-  @ApiBody({ type: CreateRequestDto })
-  async createRequest(dto: CreateRequestDto, user: BackendJwtPayload) {
+  @ApiBody({ type: CreateAzureRequestDto })
+  async createRequestAzure(
+    dto: CreateAzureRequestDto,
+    user: BackendJwtPayload,
+  ) {
     const { repository, resources, ...request } = dto;
     const ownerId = user.id;
 
@@ -107,7 +111,7 @@ export class RequestService {
     // Create resourceConfig with VMs, DBs, STs
     const resourceConfig = await this.databaseService.resourceConfig.create({
       data: {
-        vms: {
+        AzureVMInstance: {
           create: (resources.resourceConfig.vms || []).map((vm) => ({
             name: vm.name,
             numberOfCores: vm.numberOfCores,
@@ -116,10 +120,10 @@ export class RequestService {
             sizeId: vm.sizeId,
           })),
         },
-        dbs: {
+        AzureDatabase: {
           create: resources.resourceConfig.dbs || [],
         },
-        sts: {
+        AzureStorage: {
           create: resources.resourceConfig.sts || [],
         },
       },
@@ -172,9 +176,126 @@ export class RequestService {
           include: {
             resourceConfig: {
               include: {
-                vms: true,
-                dbs: true,
-                sts: true,
+                AzureVMInstance: true,
+                AzureDatabase: true,
+                AzureStorage: true,
+              },
+            },
+          },
+        },
+        repository: true,
+        owner: true,
+      },
+    });
+
+    return newRequest;
+  }
+
+  @ApiBody({ type: CreateAwsRequestDto })
+  async createRequestAws(dto: CreateAwsRequestDto, user: BackendJwtPayload) {
+    const { repository, resources, ...request } = dto;
+    const ownerId = user.id;
+
+    const ownerInDb = await this.databaseService.user.findUnique({
+      where: { id: ownerId },
+      select: { id: true },
+    });
+
+    if (!ownerInDb) {
+      throw new BadRequestException('Authenticated user not found in database');
+    }
+
+    // Check repository name uniqueness
+    const existingRepo = await this.databaseService.repository.findUnique({
+      where: { name: repository.name },
+    });
+    if (existingRepo)
+      throw new ConflictException('Repository name already exists');
+
+    // Verify collaborators exist
+    const collaboratorIds =
+      repository.collaborators?.map((c) => c.userId) || [];
+
+    const collaboratorsInDb = await this.databaseService.user.findMany({
+      where: { id: { in: collaboratorIds } },
+      select: { id: true },
+    });
+
+    if (collaboratorsInDb.length !== collaboratorIds.length) {
+      throw new BadRequestException('One or more collaborators not found');
+    }
+
+    // Create resourceConfig with VMs, DBs, STs
+    const resourceConfig = await this.databaseService.resourceConfig.create({
+      data: {
+        AwsVMInstance: {
+          create: (resources.resourceConfig.vms || []).map((vm) => ({
+            instanceName: vm.instanceName,
+            os: vm.os,
+            keyName: vm.keyName,
+            sgName: vm.sgName,
+            awsInstanceTypeId: vm.awsInstanceTypeId,
+          })),
+        },
+        AwsDatabase: {
+          create: resources.resourceConfig.dbs || [],
+        },
+        AwsStorage: {
+          create: resources.resourceConfig.sts || [],
+        },
+      },
+    });
+
+    // Create Resources linked to resourceConfig
+    const newResource = await this.databaseService.resources.create({
+      data: {
+        name: resources.name,
+        cloudProvider: resources.cloudProvider as CloudProvider,
+        region: resources.region,
+        resourceConfig: { connect: { id: resourceConfig.id } },
+      },
+    });
+
+    // Create Repository with collaborators (using userId)
+    const newRepository = await this.databaseService.repository.create({
+      data: {
+        name: repository.name,
+        description: repository.description,
+        resources: { connect: { id: newResource.id } },
+        RepositoryCollaborator: {
+          create:
+            repository.collaborators?.map((c) => ({ userId: c.userId })) || [],
+        },
+      },
+    });
+
+    // Generate displayCode for Request
+    const lastRequest = await this.databaseService.request.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { displayCode: true },
+    });
+    const lastNumber = lastRequest
+      ? parseInt(lastRequest.displayCode.split('-')[1])
+      : 0;
+    const displayCode = `R-${lastNumber + 1}`;
+
+    // Create Request linking owner, repository, resources
+    const newRequest = await this.databaseService.request.create({
+      data: {
+        description: request.description,
+        displayCode,
+        owner: { connect: { id: ownerId } },
+        repository: { connect: { id: newRepository.id } },
+        resources: { connect: { id: newResource.id } },
+      },
+      include: {
+        resources: {
+          include: {
+            resourceConfig: {
+              include: {
+                AwsVMInstance: true,
+                AwsDatabase: true,
+                AwsStorage: true,
               },
             },
           },
@@ -207,23 +328,25 @@ export class RequestService {
         select: { resources: { select: { resourceConfigId: true } } },
       });
 
-      const findNumberOfVM = await this.databaseService.vMInstance.count({
+      const findNumberOfVM = await this.databaseService.azureVMInstance.count({
         where: {
           resourceConfigId: resourceConfigId?.resources.resourceConfigId,
         },
       });
 
-      const findNumberOfDB = await this.databaseService.databaseInstance.count({
-        where: {
-          resourceConfigId: resourceConfigId?.resources.resourceConfigId,
-        },
-      });
+      const findNumberOfDB =
+        await this.databaseService.azureDatabaseInstance.count({
+          where: {
+            resourceConfigId: resourceConfigId?.resources.resourceConfigId,
+          },
+        });
 
-      const findNumberOfST = await this.databaseService.storageInstance.count({
-        where: {
-          resourceConfigId: resourceConfigId?.resources.resourceConfigId,
-        },
-      });
+      const findNumberOfST =
+        await this.databaseService.azureStorageInstance.count({
+          where: {
+            resourceConfigId: resourceConfigId?.resources.resourceConfigId,
+          },
+        });
 
       console.log('Number of VMs:', findNumberOfVM);
       console.log('Number of DBs:', findNumberOfDB);
@@ -278,13 +401,22 @@ export class RequestService {
           include: {
             resourceConfig: {
               include: {
-                vms: {
+                AzureVMInstance: {
                   include: {
                     size: true,
                   },
                 },
-                dbs: true,
-                sts: true,
+                AzureDatabase: true,
+                AzureStorage: true,
+                AwsVMInstance: {
+                  include: {
+                    AwsInstanceType: true,
+                  },
+                },
+                AwsDatabase: {
+                  include: { dbInstanceClass: true },
+                },
+                AwsStorage: true,
               },
             },
           },

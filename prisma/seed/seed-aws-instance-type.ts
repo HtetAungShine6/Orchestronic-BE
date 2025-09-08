@@ -16,11 +16,10 @@ async function main() {
   const data = JSON.parse(raw);
 
   const records = data.InstanceTypes.map((it) => ({
-    id: it.InstanceType,
-    region: 'ap-southeast-1',
+    name: it.InstanceType,
+    numberOfCores: it.VCpuInfo?.DefaultVCpus ?? 0,
+    memoryInMB: it.MemoryInfo?.SizeInMiB ?? 0,
     raw: it,
-    core: it.VCpuInfo?.DefaultVCpus ?? 0,
-    ram: it.MemoryInfo?.SizeInMiB ?? 0,
   }));
 
   // delete old data first

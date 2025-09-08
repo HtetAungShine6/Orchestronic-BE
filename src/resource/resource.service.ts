@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CreateResourceDto } from './dto/create-resource.dto';
-import { UpdateResourceDto } from './dto/update-resource.dto';
+import { CreateAzureResourceDto } from './dto/create-azure-resource.dto';
 import { DatabaseService } from '../database/database.service';
 import { BackendJwtPayload } from '../lib/types';
 
@@ -40,10 +39,6 @@ export interface AzureRetailPriceResponse {
 export class ResourceService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  create(createResourceDto: CreateResourceDto) {
-    return `this action add new resource`;
-  }
-
   async getVmPrice(vmSize: string, region: string) {
     const url = `https://prices.azure.com/api/retail/prices?$filter=armSkuName eq '${vmSize}' and armRegionName eq '${region}' and priceType eq 'Consumption' and serviceName eq 'Virtual Machines'`;
 
@@ -71,17 +66,17 @@ export class ResourceService {
         },
         resourceConfig: {
           include: {
-            vms: {
+            AzureVMInstance: {
               select: {
                 id: true,
               },
             },
-            dbs: {
+            AzureDatabase: {
               select: {
                 id: true,
               },
             },
-            sts: {
+            AwsStorage: {
               select: {
                 id: true,
               },
@@ -96,17 +91,5 @@ export class ResourceService {
         },
       },
     });
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} resource`;
-  }
-
-  update(id: number, updateResourceDto: UpdateResourceDto) {
-    return `This action updates a #${id} resource`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} resource`;
   }
 }

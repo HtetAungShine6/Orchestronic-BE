@@ -4,6 +4,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seeding...');
 
+  await import('./seed/seed-aws-db');
   await import('./seed/seed-azure-vm-size');
   await import('./seed/seed-policy');
   await import('./seed/seed-aws-instance-type');

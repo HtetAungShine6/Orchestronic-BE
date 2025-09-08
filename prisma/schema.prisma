@@ -49,24 +49,19 @@ model Resources {
 }
 
 model ResourceConfig {
-  id        String             @id @default(uuid())
-  dbs       DatabaseInstance[]
-  resources Resources?
-  sts       StorageInstance[]
-  vms       VMInstance[]
+  id              String                  @id @default(uuid())
+  AzureDatabase   AzureDatabaseInstance[]
+  resources       Resources?
+  AzureStorage    AzureStorageInstance[]
+  AzureVMInstance AzureVMInstance[]
+  AwsVMInstance   AwsVMInstance[]
+  AwsStorage      AwsStorageInstance[]
+  AwsDatabase     AwsDatabaseInstance[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 }
 
-model VMInstance {
-  id               String         @id @default(uuid())
-  name             String
-  os               String
-  resourceConfigId String
-  sizeId           String
-  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
-  size             AzureVMSize    @relation(fields: [sizeId], references: [id], onDelete: Cascade)
-}
-
-model DatabaseInstance {
+model AzureDatabaseInstance {
   id               String         @id @default(uuid())
   storageGB        Int            @default(32768)
   resourceConfigId String
@@ -78,7 +73,7 @@ model DatabaseInstance {
   resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
 }
 
-model StorageInstance {
+model AzureStorageInstance {
   id               String         @id @default(uuid())
   resourceConfigId String
   accessTier       String         @default("Hot")
@@ -94,11 +89,52 @@ model User {
   email                  String                   @unique
   role                   Role
   CloudResourceSecret    CloudResourceSecret[]
-  RefreshToken           RefreshToken[]
   RepositoryCollaborator RepositoryCollaborator[]
   request                Request[]
   UserRepository         ownedRepository[]
   collaboratedRepos      Repository[]             @relation("RepositoryCollaborators")
+}
+
+model AzureVMInstance {
+  id               String         @id @default(uuid())
+  name             String
+  os               String
+  sizeId           String
+  size             AzureVMSize    @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  resourceConfigId String
+  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+}
+
+model AwsVMInstance {
+  id                String          @id @default(uuid())
+  instanceName      String
+  os                String
+  keyName           String
+  sgName            String
+  resourceConfigId  String
+  ResourceConfig    ResourceConfig  @relation(fields: [resourceConfigId], references: [id])
+  awsInstanceTypeId String
+  AwsInstanceType   AwsInstanceType @relation(fields: [awsInstanceTypeId], references: [id])
+}
+
+model AwsDatabaseInstance {
+  id                 String          @id @default(uuid())
+  dbName             String
+  dbUsername         String
+  dbPassword         String
+  awsDatabaseTypeId  String
+  dbInstanceClass    AwsDatabaseType @relation(fields: [awsDatabaseTypeId], references: [id])
+  dbAllocatedStorage Int
+  engine             Engine
+  resourceConfigId   String
+  resourceConfig     ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+}
+
+model AwsStorageInstance {
+  id               String         @id @default(uuid())
+  bucketName       String
+  resourceConfigId String
+  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
 }
 
 model ownedRepository {
@@ -121,15 +157,6 @@ model RepositoryCollaborator {
   @@map("RepositoryCollaborators")
 }
 
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 model CloudResourceSecret {
   id             String        @id @default(uuid())
   clientId       String        @unique
@@ -142,43 +169,69 @@ model CloudResourceSecret {
 }
 
 model AzureVMSize {
-  id                   String       @id @default(uuid())
-  name                 String       @unique
+  id                   String            @id @default(uuid())
+  name                 String            @unique
   numberOfCores        Int
   maxDataDiskCount     Int
   memoryInMB           Int
   osDiskSizeInMB       Int
   resourceDiskSizeInMB Int
-  VMInstance           VMInstance[]
+  VMInstance           AzureVMInstance[]
 }
 
-model PolicyVM {
-  id            String        @id @default(uuid())
+model AzurePolicyVM {
+  id            String @id @default(uuid())
   name          String
   memoryInMB    Int
   numberOfCores Int
-  cloudProvider CloudProvider @unique
 }
 
-model PolicyDatabase {
-  id            String        @id @default(uuid())
-  maxStorage    Int
-  cloudProvider CloudProvider @unique
+model AzurePolicyDatabase {
+  id         String @id @default(uuid())
+  maxStorage Int
 }
 
-model PolicyStorage {
-  id            String        @id @default(uuid())
-  maxStorage    Int
-  cloudProvider CloudProvider @unique
+model AzurePolicyStorage {
+  id         String @id @default(uuid())
+  maxStorage Int
+}
+
+model AwsPolicyVM {
+  id            String @id @default(uuid())
+  name          String
+  memoryInMB    Int
+  numberOfCores Int
+}
+
+model AwsPolicyDatabase {
+  id         String @id @default(uuid())
+  maxStorage Int
+}
+
+model AwsPolicyStorage {
+  id         String @id @default(uuid())
+  maxStorage Int
 }
 
 model AwsInstanceType {
-  id        String   @id @map("InstanceType")
-  region    String
-  raw       Json
-  core      Int
-  ram       Int
-  createdAt DateTime @default(now())
+  id            String          @id @default(uuid())
+  name          String          @unique
+  numberOfCores Int
+  memoryInMB    Int
+  raw           Json
+  AwsVMInstance AwsVMInstance[]
+}
+
+model AwsDatabaseType {
+  id                  String                @id @default(uuid())
+  DBInstanceClass     String
+  engine              Engine
+  raw                 Json
+  MinStorageSize      Int
+  MaxStorageSize      Int
+  AwsDatabaseInstance AwsDatabaseInstance[]
+
+  @@unique([engine, DBInstanceClass])
 }
 
 enum RepositoryStatus {

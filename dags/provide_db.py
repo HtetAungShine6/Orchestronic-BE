@@ -21,7 +21,7 @@ default_args = {
 # -------------------------
 # Step 1: RabbitMQ Consumer
 # -------------------------
-import pika, json
+import json
 
 def rabbitmq_consumer():
     load_dotenv(expanduser('/opt/airflow/dags/.env'))

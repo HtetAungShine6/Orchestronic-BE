@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { CloudProvidersService } from './cloud-providers.service';
 import { GetVmSizesDto } from 'src/request/dto/get-vm-sizes.dto';
+import { GetCloudProviderAwsDbDto } from './dto/get-cloud-provider-aws-db.dto';
 
 @Controller('cloud-providers')
 export class CloudProvidersController {
@@ -14,5 +15,10 @@ export class CloudProvidersController {
   @Get('/aws')
   async findAws(@Query() query: GetVmSizesDto) {
     return this.cloudProvidersService.findAws(query);
+  }
+
+  @Get('/aws-db')
+  findAwsDB(@Query() query: GetCloudProviderAwsDbDto) {
+    return this.cloudProvidersService.findAwsDB(query);
   }
 }

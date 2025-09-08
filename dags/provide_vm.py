@@ -1,7 +1,7 @@
 import ast
 import os
 import json
-import pika
+# import pika
 import psycopg2
 from dotenv import load_dotenv
 from os.path import expanduser

@@ -3,51 +3,45 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.policyVM.deleteMany({});
-  await prisma.policyDatabase.deleteMany({});
-  await prisma.policyStorage.deleteMany({});
+  await prisma.azurePolicyVM.deleteMany({});
+  await prisma.azurePolicyDatabase.deleteMany({});
+  await prisma.azurePolicyStorage.deleteMany({});
 
   //Azure
-  await prisma.policyVM.create({
+  await prisma.azurePolicyVM.create({
     data: {
       name: 'Standard_B1ls',
       numberOfCores: 1,
       memoryInMB: 512,
-      cloudProvider: 'AZURE',
     },
   });
-  await prisma.policyDatabase.create({
+  await prisma.azurePolicyDatabase.create({
     data: {
       maxStorage: 100,
-      cloudProvider: 'AZURE',
     },
   });
-  await prisma.policyStorage.create({
+  await prisma.azurePolicyStorage.create({
     data: {
       maxStorage: 200,
-      cloudProvider: 'AZURE',
     },
   });
 
   //aws
-  await prisma.policyVM.create({
+  await prisma.awsPolicyVM.create({
     data: {
-      name: 'Standard_B1ls',
-      numberOfCores: 1,
-      memoryInMB: 512,
-      cloudProvider: 'AWS',
+      name: 'm6i.xlarge',
+      numberOfCores: 4,
+      memoryInMB: 16384,
     },
   });
-  await prisma.policyDatabase.create({
+  await prisma.awsPolicyDatabase.create({
     data: {
       maxStorage: 100,
-      cloudProvider: 'AWS',
     },
   });
-  await prisma.policyStorage.create({
+  await prisma.awsPolicyStorage.create({
     data: {
       maxStorage: 200,
-      cloudProvider: 'AWS',
     },
   });
 }

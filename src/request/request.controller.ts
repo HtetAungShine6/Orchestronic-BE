@@ -15,15 +15,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { RequestService } from './request.service';
-import { Prisma, RepositoryStatus, Role, Status } from '@prisma/client';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiOperation,
-  ApiQuery,
-  ApiResponse,
-} from '@nestjs/swagger';
-import { CreateRequestDto } from './dto/create-request.dto';
+import { Prisma, Status } from '@prisma/client';
+import { ApiBody, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { CreateAzureRequestDto } from './dto/create-request-azure.dto';
 import * as jwt from 'jsonwebtoken';
 import {
   RequestStatus,
@@ -34,6 +28,8 @@ import { GetVmSizesDto } from './dto/get-vm-sizes.dto';
 import { PaginatedVmSizesDto } from './dto/paginated-vm-sizes.dto';
 import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 import { GitlabService } from '../gitlab/gitlab.service';
+import { CreateAwsResourceDto } from 'src/resource/dto/create-aws-resource.dto';
+import { CreateAwsRequestDto } from './dto/create-request-aws.dto';
 
 @Controller('request')
 export class RequestController {
@@ -143,14 +139,14 @@ export class RequestController {
     return this.requestService.findById(+id);
   }
 
-  @Post()
+  @Post('/azure')
   @ApiOperation({
-    summary: 'Create a new request',
+    summary: 'Create a new request Azure',
   })
-  @ApiBody({ type: CreateRequestDto })
-  async createRequest(
+  @ApiBody({ type: CreateAzureRequestDto })
+  async createRequestAzure(
     @Request() req: RequestWithCookies,
-    @Body() request: CreateRequestDto,
+    @Body() request: CreateAzureRequestDto,
   ) {
     const token = req.cookies?.['access_token'];
     if (token === undefined) {
@@ -165,7 +161,36 @@ export class RequestController {
     try {
       const decoded = jwt.verify(token, secret) as unknown;
       const payload = decoded as BackendJwtPayload;
-      return this.requestService.createRequest(request, payload);
+      return this.requestService.createRequestAzure(request, payload);
+    } catch {
+      console.error('Request Controller: Error decoding token');
+      throw new Error('Invalid token - unable to process');
+    }
+  }
+
+  @Post('/aws')
+  @ApiOperation({
+    summary: 'Create a new request Aws',
+  })
+  @ApiBody({ type: CreateAwsRequestDto })
+  async createRequestAws(
+    @Request() req: RequestWithCookies,
+    @Body() request: CreateAwsRequestDto,
+  ) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as unknown;
+      const payload = decoded as BackendJwtPayload;
+      return this.requestService.createRequestAws(request, payload);
     } catch {
       console.error('Request Controller: Error decoding token');
       throw new Error('Invalid token - unable to process');

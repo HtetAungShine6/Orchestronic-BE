@@ -22,13 +22,14 @@ import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import { AirflowModule } from './airflow/airflow.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { CloudModule } from './cloud/cloud.module';
-import { PolicyService } from './policy/policy.service';
-import { PolicyController } from './policy/policy.controller';
-import { PolicyModule } from './policy/policy.module';
 import { HttpModule } from '@nestjs/axios';
 import { GitlabModule } from './gitlab/gitlab.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CloudProvidersModule } from './cloud-providers/cloud-providers.module';
+import { AzurePolicyModule } from './azure-policy/azure-policy.module';
+import { AzurePolicyController } from './azure-policy/azure-policy.controller';
+import { AzurePolicyService } from './azure-policy/azure-policy.service';
+import { AwsPolicyModule } from './aws-policy/aws-policy.module';
 
 @Module({
   imports: [
@@ -82,9 +83,10 @@ import { CloudProvidersModule } from './cloud-providers/cloud-providers.module';
     RabbitmqModule,
     AirflowModule,
     CloudModule,
-    PolicyModule,
+    AzurePolicyModule,
     GitlabModule,
     CloudProvidersModule,
+    AwsPolicyModule,
   ],
   controllers: [
     AppController,
@@ -92,7 +94,7 @@ import { CloudProvidersModule } from './cloud-providers/cloud-providers.module';
     RepositoriesController,
     AirflowController,
     RabbitmqController,
-    PolicyController,
+    AzurePolicyController,
   ],
   providers: [
     // { provide: APP_GUARD, useClass: JwtAuthGuard },
@@ -100,7 +102,7 @@ import { CloudProvidersModule } from './cloud-providers/cloud-providers.module';
     RepositoriesService,
     AirflowService,
     RabbitmqService,
-    PolicyService,
+    AzurePolicyService,
   ],
 })
 export class AppModule {}

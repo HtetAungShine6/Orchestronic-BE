@@ -1,9 +1,9 @@
-import { Controller, Param, UseGuards } from '@nestjs/common';
+import { Controller, Param } from '@nestjs/common';
 import { Get, Query, Post, Body, Request } from '@nestjs/common';
 import { RepositoriesService } from './repositories.service';
-import { CreateRepositoriesDto } from './dto/create-repository.dto';
-import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { CreateAzureRepositoriesDto } from './dto/create-azure-repository.dto';
+import { CreateAwsRepositoriesDto } from './dto/create-aws-repository.dto';
+import { ApiOperation } from '@nestjs/swagger';
 import { BackendJwtPayload, RequestWithHeaders } from '../lib/types';
 import * as jwt from 'jsonwebtoken';
 import { RequestWithCookies } from '../lib/types';
@@ -22,12 +22,20 @@ export class RepositoriesController {
     return this.repositoriesService.findByName(name);
   }
 
-  @Post()
+  @Post('/create-azure-repository/')
   @ApiOperation({
-    summary: 'Create a new repository',
+    summary: 'Create a new Azure repository',
   })
-  createRepository(@Body() repository: CreateRepositoriesDto) {
-    return this.repositoriesService.createRepository(repository);
+  createAzureRepository(@Body() repository: CreateAzureRepositoriesDto) {
+    return this.repositoriesService.createRepositoryAzure(repository);
+  }
+
+  @Post('/create-aws-repository/')
+  @ApiOperation({
+    summary: 'Create a new AWS repository',
+  })
+  createAwsRepository(@Body() repository: CreateAwsRepositoriesDto) {
+    return this.repositoriesService.createRepositoryAws(repository);
   }
 
   @Get()
