@@ -323,58 +323,8 @@ export class RequestService {
 
     // TODO: Fetch data from DB to see how many resources of each type were requested
     if (updateData.status === RequestStatus.Approved) {
-      const resourceConfigId = await this.databaseService.request.findUnique({
-        where: { id: id.toString() },
-        select: { resources: { select: { resourceConfigId: true } } },
-      });
-
-      const findNumberOfVM = await this.databaseService.azureVMInstance.count({
-        where: {
-          resourceConfigId: resourceConfigId?.resources.resourceConfigId,
-        },
-      });
-
-      const findNumberOfDB =
-        await this.databaseService.azureDatabaseInstance.count({
-          where: {
-            resourceConfigId: resourceConfigId?.resources.resourceConfigId,
-          },
-        });
-
-      const findNumberOfST =
-        await this.databaseService.azureStorageInstance.count({
-          where: {
-            resourceConfigId: resourceConfigId?.resources.resourceConfigId,
-          },
-        });
-
-      console.log('Number of VMs:', findNumberOfVM);
-      console.log('Number of DBs:', findNumberOfDB);
-      console.log('Number of STs:', findNumberOfST);
-      let maxIteration = 0;
-      let dagId: string[] = [];
-
-      // TODO: condition to assign how many times the loop will run according to the number of resources requested
-      if (findNumberOfVM && findNumberOfVM > 0) {
-        maxIteration += 1;
-        dagId.push('terraform_vm_provision');
-      }
-
-      if (findNumberOfDB && findNumberOfDB > 0) {
-        maxIteration += 1;
-        dagId.push('terraform_db_provision');
-      }
-
-      if (findNumberOfST && findNumberOfST > 0) {
-        maxIteration += 1;
-        dagId.push('terraform_st_provision');
-      }
-
-      for (let i = 0; i < maxIteration; i++) {
-        console.log('Iteration number: ', i + 1);
-        await this.rabbitmqService.queueRequest(id.toString());
-        await this.airflowService.triggerDag(user, dagId[i]);
-      }
+      this.rabbitmqService.queueRequest(id.toString());
+      this.airflowService.triggerDag(user, 'create_rg');
     }
     return updateStatus;
   }
