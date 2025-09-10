@@ -88,7 +88,7 @@ def fetch_from_database(**context):
 
     vmSizes = []
     for vm in vmInstances:
-        size_id = vm[-1]
+        size_id = vm[-2] # TODO(jan): Adding new column, make sure index is correct
         cursor.execute('SELECT "name" FROM "AzureVMSize" WHERE "id" = %s;', (size_id,))
         size = cursor.fetchone()
         vmSizes.append(size)
@@ -122,32 +122,37 @@ def create_terraform_directory(configInfo):
 # -------------------------
 # Step 3.5: SSH Key
 # -------------------------
-def generate_ssh_key(terraform_dir, repo_name):
-    private_key_path = Path(terraform_dir) / f"{repo_name}.pem"
-    public_key_path = Path(terraform_dir) / f"{repo_name}.pub"
+def generate_ssh_key(terraform_dir, configInfo):
+    import ast
+    return_data = []
+    configInfo = ast.literal_eval(configInfo)
+    for i in range(1, len(configInfo['vmInstances'])+1):
+        private_key_path = Path(terraform_dir) / f"{configInfo['repoName']}_{i}.pem"
+        public_key_path = Path(terraform_dir) / f"{configInfo['repoName']}_{i}.pub"
 
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
 
-    with open(private_key_path, "wb") as f:
-        f.write(private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        ))
+        with open(private_key_path, "wb") as f:
+            f.write(private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
 
-    public_key = private_key.public_key()
-    with open(public_key_path, "wb") as f:
-        f.write(public_key.public_bytes(
-            encoding=serialization.Encoding.OpenSSH,
-            format=serialization.PublicFormat.OpenSSH
-        ))
+        public_key = private_key.public_key()
+        with open(public_key_path, "wb") as f:
+            f.write(public_key.public_bytes(
+                encoding=serialization.Encoding.OpenSSH,
+                format=serialization.PublicFormat.OpenSSH
+            ))
+        return_data.append(str(public_key_path))
 
-    return str(public_key_path)
+    return return_data
 
 # -------------------------
 # Step 4: Terraform Files
 # -------------------------
-def write_terraform_files(terraform_dir, configInfo, public_key_path):
+def write_terraform_files(terraform_dir, configInfo, public_key_path: list):
     if isinstance(configInfo, str):
         import ast
         configInfo = ast.literal_eval(configInfo)
@@ -258,7 +263,7 @@ resource "azurerm_linux_virtual_machine" "vm" {{
 
   admin_ssh_key {{
     username   = "azureuser"
-    public_key = file(var.ssh_public_key_path)
+    public_key = file(var.ssh_public_key_path[each.key])
   }}
 
   os_disk {{
@@ -283,6 +288,11 @@ output "public_ip" {{
         f.write(main_tf_content)
 
     load_dotenv(expanduser('/opt/airflow/dags/.env'))
+
+    import ast
+    public_key_path = ast.literal_eval(public_key_path)
+    
+    ssh_key_map = {vm['id']: key for vm, key in zip(vm_resources, public_key_path)}
 
     variables_tf = f"""
         variable "subscription_id" {{
@@ -310,7 +320,7 @@ output "public_ip" {{
         }}
 
         variable "ssh_public_key_path" {{
-        default = "{public_key_path}"
+        default = {json.dumps(ssh_key_map, indent=4)}
         }}
 
         variable "vm_resources" {{
@@ -356,7 +366,7 @@ with DAG(
         python_callable=generate_ssh_key,
         op_args=[
             "{{ ti.xcom_pull(task_ids='create_terraform_dir') }}",
-            "{{ ti.xcom_pull(task_ids='fetch_config')['repoName'] }}",
+            "{{ ti.xcom_pull(task_ids='fetch_config') }}",
         ],
     )
 
