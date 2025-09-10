@@ -136,7 +136,11 @@ def write_terraform_files(configInfo, terraform_dir):
         configInfo = ast.literal_eval(configInfo)
 
         config_dict = configInfo   
-        st_resources = config_dict['st_instances']
+        st_resources = [
+        {"bucket_name": to_bucket_name(config_dict['region'], b['bucket_name'])}
+        for b in config_dict['st_instances']
+        ]
+
         project_name = to_bucket_name(config_dict['project_name'], config_dict['region'])
         load_dotenv(expanduser('/opt/airflow/dags/.env'))
 
@@ -175,35 +179,42 @@ locals {{
 
 # S3 bucket for storage
 resource "aws_s3_bucket" "app_bucket" {{
-  bucket = "${{var.project_name}}"
+  for_each = {{ for b in var.st_resources : b.bucket_name => b }}
+
+  bucket = each.value.bucket_name
   tags = merge(
-        local.common_tags,
-        {{
-        Name = "${{var.project_name}}-storage"
-        }}
-    )
+    local.common_tags,
+    {{
+      Name = "${{each.value.bucket_name}}-storage"
+    }}
+  )
 }}
+
 
 # Block all public access
 resource "aws_s3_bucket_public_access_block" "app_bucket_block" {{
-  bucket                  = aws_s3_bucket.app_bucket.id
+  for_each = aws_s3_bucket.app_bucket
+
+  bucket                  = each.value.id
   block_public_acls       = true
   ignore_public_acls      = true
   block_public_policy     = true
   restrict_public_buckets = true
 }}
 
-# Enable versioning
 resource "aws_s3_bucket_versioning" "app_bucket_versioning" {{
-  bucket = aws_s3_bucket.app_bucket.id
+  for_each = aws_s3_bucket.app_bucket
+
+  bucket = each.value.id
   versioning_configuration {{
     status = "Enabled"
   }}
 }}
 
-# Default server-side encryption
 resource "aws_s3_bucket_server_side_encryption_configuration" "app_bucket_encryption" {{
-  bucket = aws_s3_bucket.app_bucket.id
+  for_each = aws_s3_bucket.app_bucket
+
+  bucket = each.value.id
 
   rule {{
     apply_server_side_encryption_by_default {{
@@ -212,14 +223,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "app_bucket_encryp
   }}
 }}
 
+
 output "bucket_name" {{
-  description = "The name of the created S3 bucket"
-  value       = aws_s3_bucket.app_bucket.bucket
+  value = [for b in aws_s3_bucket.app_bucket : b.id]
 }}
 
 output "bucket_arn" {{
-  description = "The ARN of the created S3 bucket"
-  value       = aws_s3_bucket.app_bucket.arn
+   value = [for b in aws_s3_bucket.app_bucket : b.arn]
 }}
 
     '''
@@ -241,7 +251,10 @@ output "bucket_arn" {{
       default = "{project_name}"
     }}
 
-    variable "st_resources" {{ type = list(map(any)) }}
+    variable "st_resources" {{ 
+        description = "List of storage instances"
+        type        = list(object({{ bucket_name = string }})) 
+        }}
     '''
 
     terraform_files = {

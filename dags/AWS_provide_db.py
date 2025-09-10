@@ -230,10 +230,10 @@ resource "aws_security_group" "db_sg" {{
   vpc_id      = aws_vpc.main.id
 
   ingress {{
-    from_port   = 3306
-    to_port     = 3306
+    from_port   = var.db_resources[0].engine == "postgres" ? 5432 : 3306
+    to_port     = var.db_resources[0].engine == "postgres" ? 5432 : 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # ⚠️ Wide open; restrict in real setups
+    cidr_blocks = ["0.0.0.0/0"]
   }}
 
   egress {{
@@ -257,13 +257,14 @@ resource "aws_db_subnet_group" "db_subnet" {{
 # RDS Database Instance
 # ===============================
 resource "aws_db_instance" "my_db" {{
-  identifier             = "{projectName}"
-  engine                 = var.db_engine
-  instance_class         = var.db_instance_class
-  allocated_storage      = var.db_allocated_storage
-  db_name                = var.db_name
-  username               = var.db_username
-  password               = var.db_password
+  for_each              = {{ for db in var.db_resources : db.db_name => db }}
+  identifier             = each.value.db_name
+  engine                 = each.value.engine
+  instance_class         = each.value.instance_type
+  allocated_storage      = each.value.db_allocated_storage
+  db_name                = each.value.db_name
+  username               = each.value.db_username
+  password               = each.value.db_password
   db_subnet_group_name   = aws_db_subnet_group.db_subnet.name
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   skip_final_snapshot    = true
@@ -274,11 +275,11 @@ resource "aws_db_instance" "my_db" {{
 # Outputs
 # ===============================
 output "db_endpoint" {{
-  value = aws_db_instance.my_db.endpoint
+  value = {{ for k, v in aws_db_instance.db : k => v.endpoint }}
 }}
 
 output "db_port" {{
-  value = aws_db_instance.my_db.port
+  value = {{ for k, v in aws_db_instance.db : k => v.port }}
 }}
     """
     with open(f"{terraform_dir}/main.tf", "w") as f:
@@ -299,31 +300,17 @@ output "db_port" {{
     default = "{config_dict['region']}"
     }}
 
-    variable "db_username" {{
-    default = "{config_dict['db_instances'][0]['db_username']}"
+    variable "db_resources" {{
+    type = list(object({{
+    db_name             = string
+    instance_type       = string
+    db_allocated_storage= number
+    db_username         = string
+    db_password         = string
+    engine              = string
+    }}))
     }}
 
-    variable "db_password" {{
-    default = "{config_dict['db_instances'][0]['db_password']}" 
-    }}
-
-    variable "db_name" {{
-    default = "{config_dict['db_instances'][0]['db_name']}"
-    }}
-
-    variable "db_instance_class" {{
-    default = "{config_dict['db_instances'][0]['instance_type']}"
-    }}
-
-    variable "db_allocated_storage"  {{
-    default = {config_dict['db_instances'][0]['db_allocated_storage']}
-    }}
-
-    variable "db_engine"  {{
-    default = "{config_dict['db_instances'][0]['engine']}"
-    }}
-
-    variable "db_resources" {{ type = list(map(any)) }}
     """
     with open(f"{terraform_dir}/variables.tf", "w") as f:
         f.write(variables_tf)
