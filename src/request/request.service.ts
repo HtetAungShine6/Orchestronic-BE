@@ -323,8 +323,41 @@ export class RequestService {
 
     // TODO: Fetch data from DB to see how many resources of each type were requested
     if (updateData.status === RequestStatus.Approved) {
-      this.rabbitmqService.queueRequest(id.toString());
-      this.airflowService.triggerDag(user, 'create_rg');
+      const request = await this.databaseService.request.findFirst({
+        where: { id: id.toString() },
+        select: {
+          resourcesId: true,
+        },
+      });
+
+      if (!request?.resourcesId) {
+        throw new Error(`No resourcesId found for request ${id}`);
+      }
+
+      const result = await this.databaseService.resources.findFirst({
+        where: { id: request?.resourcesId },
+        select: {
+          cloudProvider: true,
+        },
+      });
+
+      const cloudProvider = result?.cloudProvider;
+
+      if (!cloudProvider) {
+        throw new Error(
+          `No cloudProvider found for resourcesId ${request?.resourcesId}`,
+        );
+      }
+
+      if (cloudProvider == CloudProvider.AWS) {
+        this.rabbitmqService.queueRequest(id.toString());
+        this.airflowService.triggerDag(user, 'AWS_Resources');
+      } else if (cloudProvider == CloudProvider.AZURE) {
+        this.rabbitmqService.queueRequest(id.toString());
+        this.airflowService.triggerDag(user, 'AZURE_Resource_Group');
+      } else {
+        throw new Error(`Unsupported cloudProvider: ${cloudProvider}`);
+      }
     }
     return updateStatus;
   }
