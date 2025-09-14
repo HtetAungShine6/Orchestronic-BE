@@ -28,9 +28,11 @@ default_args = {
 def rabbitmq_consumer():
     load_dotenv(expanduser('/opt/airflow/dags/.env'))
     rabbit_url = os.getenv("RABBITMQ_URL")
-    rabbit_url = "amqp://guest:guest@host.docker.internal:5672"
+    # rabbit_url = "amqp://guest:guest@host.docker.internal:5672"
     if not rabbit_url:
         raise ValueError("RABBITMQ_URL is not set in .env")
+
+    print(rabbit_url)
 
     connection = pika.BlockingConnection(pika.URLParameters(rabbit_url))
     channel = connection.channel()
