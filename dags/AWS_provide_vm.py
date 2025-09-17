@@ -376,7 +376,7 @@ def write_to_db(terraform_dir, configInfo):
     )
     vmInstances = configInfo["vmInstances"]
     for i in range(len(vmInstances)):
-        pem_path = Path(terraform_dir) / f"{repoName}_{i+1}.pem"
+        pem_path = Path(terraform_dir) / f"{configInfo['project_name']}_{i+1}.pem"
         if pem_path.exists():
             with open(pem_path, 'r') as f:
                 pem_content = f.read()
