@@ -1,19 +1,16 @@
-import ast
 import os
 import json
-import pika
 import psycopg2
 from dotenv import load_dotenv
 from os.path import expanduser
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
-
 
 # -------------------------
 # Default DAG args
@@ -25,12 +22,37 @@ default_args = {
     'retries': 1,
 }
 
+# -------------------------
+# Step 1: RabbitMQ Consumer
+# -------------------------
+# def rabbitmq_consumer():
+#     load_dotenv(expanduser('/opt/airflow/dags/.env'))
+#     rabbit_url = "amqp://airflow:airflow@airflow_rabbitmq_broker:5672" #"amqp://guest:guest@host.docker.internal:5672"
+
+#     connection = pika.BlockingConnection(pika.URLParameters(rabbit_url))
+#     channel = connection.channel()
+
+#     method_frame, _, body = channel.basic_get(queue='request', auto_ack=True)
+#     if method_frame:
+#         message = body.decode()
+#         obj = json.loads(message)
+#         request_id = obj["data"]["requestId"]
+#         print(f"[x] Got message: {request_id}")
+#         connection.close()
+#         return request_id
+#     else:
+#         print("[x] No message in queue")
+#         connection.close()
+#         return None
+
+# -------------------------
+# Step 2: Fetch from Supabase
+# -------------------------
 def fetch_from_database(**context):
     request_id = context['dag_run'].conf.get('request_id')
     if not request_id:
-        raise ValueError("No message received. Stop DAG run.")
+        raise ValueError("No message received from RabbitMQ. Stop DAG run.")
 
-    # Load environment variables
     load_dotenv(expanduser('/opt/airflow/dags/.env'))
 
     USER = os.getenv("DB_USER")
@@ -39,324 +61,279 @@ def fetch_from_database(**context):
     PORT = os.getenv("DB_PORT")
     DBNAME = os.getenv("DB_NAME")
 
-    # print(f"Connecting to database {DBNAME} at {HOST}:{PORT} as user {USER}")
-
     connection = psycopg2.connect(
-        user=USER,
-        password=PASSWORD,
-        host=HOST,
-        port=PORT,
-        dbname=DBNAME,
+        user=USER, password=PASSWORD,
+        host=HOST, port=PORT, dbname=DBNAME
     )
     cursor = connection.cursor()
 
-    # ResourcesId, repositoryId
-    cursor.execute(
-        'SELECT "resourcesId", "repositoryId" FROM "Request" WHERE id = %s;',
-        (request_id,)
-    )
+    cursor.execute('SELECT "resourcesId" FROM "Request" WHERE id = %s;', (request_id,))
     res = cursor.fetchone()
     if not res:
         raise ValueError(f"No request found for id={request_id}")
-    resourcesId, repositoryId = res
+    resourcesId = res[0]
 
-    # ResourceConfigId
-    cursor.execute(
-        'SELECT "resourceConfigId" FROM "Resources" WHERE id = %s;',
-        (resourcesId,)
-    )
-    row = cursor.fetchone()
-    if not row:
-        raise ValueError(f"No resource found for resourceConfigId={resourcesId}")
-    resourceConfigId = row
+    cursor.execute('''
+        SELECT "name", "region", "resourceConfigId"
+        FROM "Resources" WHERE id = %s;
+    ''', (resourcesId,))
+    resource = cursor.fetchone()
+    if not resource:
+        raise ValueError(f"No resource found for resourcesId={resourcesId}")
 
-    # ProjectName
-    cursor.execute(
-        'SELECT "name" FROM "Repository" WHERE id = %s;',
-        (repositoryId,)
-    )
-    row = cursor.fetchone()
-    if not row:
-        raise ValueError(f"No repository found for id={repositoryId}")
-    projectName = row[0]
+    repoName, region, resourceConfigId = resource
 
-    # awsInstanceType, instanceName, keyName, sgName
-    cursor.execute(
-        'SELECT "awsInstanceTypeId", "instanceName", "keyName", "sgName" '
-        'FROM "AwsVMInstance" WHERE "resourceConfigId" = %s;',
-        (resourceConfigId,)
-    )
-    vm_instances = cursor.fetchall()
-    if not vm_instances:
-        raise ValueError(f"No VM instance found for resourceConfigId={resourceConfigId}")
-    # print(f"VM Instances: {vm_instances}")
-    # Shared values
-    key_name = vm_instances[0][2]
-    sg_name = vm_instances[0][3]
+    cursor.execute('SELECT * FROM "AzureVMInstance" WHERE "resourceConfigId" = %s;', (resourceConfigId,))
+    vmInstances = cursor.fetchall()
 
-    instance_list = []
-    for vm in vm_instances:
-        awsInstanceTypeId, instanceName, keyName, sgName = vm
-        cursor.execute(
-            'SELECT "name" FROM "AwsInstanceType" WHERE id = %s;',
-            (awsInstanceTypeId,)
-        )
-        row = cursor.fetchone()
-        if not row:
-            raise ValueError(f"No instance type found for id={awsInstanceTypeId}")
-        instanceType = row[0]
-
-        instance_list.append({
-            "instance_name": instanceName,
-            "instance_type": instanceType,
-            "key_name": keyName,
-            "sg_name": sgName
-        })
+    vmSizes = []
+    for vm in vmInstances:
+        size_id = vm[-3] # TODO(jan): Adding new column, make sure index is correct
+        cursor.execute('SELECT "name" FROM "AzureVMSize" WHERE "id" = %s;', (size_id,))
+        size = cursor.fetchone()
+        vmSizes.append(size)
 
     cursor.close()
     connection.close()
 
-    configInfo = {
-        "resourcesId": resourcesId, 
-        "project_name": projectName,
-        "sg_name": sg_name,
-        "key_name": key_name,
-        "region": "ap-southeast-1",
-        "vm_instances": instance_list
+    return {
+        "resourcesId": resourcesId,
+        "repoName": repoName,
+        "region": region,
+        "vmInstances": vmInstances,
+        "vmSizes": vmSizes,           
     }
-    return configInfo
 
+
+# -------------------------
+# Step 3: Terraform Directory
+# -------------------------
 def create_terraform_directory(configInfo):
     if isinstance(configInfo, str):
         import ast
         configInfo = ast.literal_eval(configInfo)
         
-    projectName = configInfo['project_name']
+    projectName = configInfo['repoName']
     terraform_dir = f"/opt/airflow/dags/terraform/{projectName}/vm"
     os.makedirs(terraform_dir, exist_ok=True)
-    # print(f"[x] Created directory {terraform_dir}")
+    print(f"[x] Created directory {terraform_dir}")
     return terraform_dir
 
-def generate_ssh_key(terraform_dir, repo_name):
-    private_key_path = Path(terraform_dir) / f"{repo_name}.pem"
-    public_key_path = Path(terraform_dir) / f"{repo_name}.pub"
+# -------------------------
+# Step 3.5: SSH Key
+# -------------------------
+def generate_ssh_key(terraform_dir, configInfo):
+    import ast
+    return_data = []
+    configInfo = ast.literal_eval(configInfo)
+    for i in range(1, len(configInfo['vmInstances'])+1):
+        private_key_path = Path(terraform_dir) / f"{configInfo['repoName']}_{i}.pem"
+        public_key_path = Path(terraform_dir) / f"{configInfo['repoName']}_{i}.pub"
 
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
 
-    with open(private_key_path, "wb") as f:
-        f.write(private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        ))
+        with open(private_key_path, "wb") as f:
+            f.write(private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
 
-    public_key = private_key.public_key()
-    with open(public_key_path, "wb") as f:
-        f.write(public_key.public_bytes(
-            encoding=serialization.Encoding.OpenSSH,
-            format=serialization.PublicFormat.OpenSSH
-        ))
+        public_key = private_key.public_key()
+        with open(public_key_path, "wb") as f:
+            f.write(public_key.public_bytes(
+                encoding=serialization.Encoding.OpenSSH,
+                format=serialization.PublicFormat.OpenSSH
+            ))
+        return_data.append(str(public_key_path))
 
-    return str(public_key_path)
+    return return_data
 
-def write_terraform_files(terraform_dir, configInfo, public_key_path):
+# -------------------------
+# Step 4: Terraform Files
+# -------------------------
+def write_terraform_files(terraform_dir, configInfo, public_key_path: list):
     if isinstance(configInfo, str):
         import ast
         configInfo = ast.literal_eval(configInfo)
         
     config_dict = configInfo
-    projectName = f"{config_dict['project_name']}"
-    vm_resources = config_dict['vm_instances']
-    key_name = config_dict['key_name']
-    sg_name = config_dict['sg_name']
+    projectName = f"{config_dict['repoName']}-{config_dict['resourcesId'][:4]}"
+    vm_keys = ["id", "name", "os", "resourceConfigId", "sizeId"]
+    vm_resources = []
+    for vm_instance, vm_size in zip(config_dict['vmInstances'], config_dict['vmSizes']):
+        vm_dict = {k: v for k, v in zip(vm_keys, vm_instance)}
+        vm_dict["vmSize"] = vm_size[0]
+        vm_resources.append(vm_dict)
 
     load_dotenv(expanduser('/opt/airflow/dags/.env'))
-     # terraform.auto.tfvars
+ # terraform.auto.tfvars
     tfvars_content = f"""
-    access_key      = "{os.getenv('AWS_ACCESS_KEY')}"
-    secret_key           = "{os.getenv('AWS_SECRET_KEY')}"
-    project_location     = "{config_dict['region']}"
-    project_name         = "{projectName}"
-    vm_instances = {json.dumps(vm_resources, indent=4)}
-    """
+subscription_id      = "{os.getenv('AZURE_SUBSCRIPTION_ID')}"
+client_id            = "{os.getenv('AZURE_CLIENT_ID')}"
+client_secret        = "{os.getenv('AZURE_CLIENT_SECRET')}"
+tenant_id            = "{os.getenv('AZURE_TENANT_ID')}"
+project_location     = "{config_dict['region']}"
+repoName             = "{config_dict['repoName'] + '-' + config_dict['resourcesId'][:4]}"
+vm_resources = {json.dumps(vm_resources, indent=4)}
+"""
     with open(f"{terraform_dir}/terraform.auto.tfvars", "w") as f:
         f.write(tfvars_content)
 
+
     main_tf_content = f"""
-    terraform {{
-    required_providers {{
-        aws = {{
-        source  = "hashicorp/aws"
-        version = "~>5.0"
-        }}
+terraform {{
+  required_providers {{
+    azurerm = {{
+      source  = "hashicorp/azurerm"
+      version = "~>3.0"
     }}
-    }}
+  }}
+}}
 
-    provider "aws" {{
-    region     = var.project_location
-    access_key = var.access_key
-    secret_key = var.secret_key
-    }}
+provider "azurerm" {{
+  features {{}}
+  subscription_id = var.subscription_id
+  client_id       = var.client_id
+  client_secret   = var.client_secret
+  tenant_id       = var.tenant_id
+}}
 
+data "azurerm_resource_group" "rg" {{
+  name = "{projectName}"
+}}
 
-    data "aws_ami" "ubuntu2204" {{
-    most_recent = true
-    owners      = ["099720109477"] # Canonical
+locals {{
+  rg_name     = data.azurerm_resource_group.rg.name
+  rg_location = data.azurerm_resource_group.rg.location
+}}
 
-    filter {{
-        name   = "name"
-        values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-    }}
-    }}
+resource "azurerm_virtual_network" "vnet" {{
+  name                = "vnet-{projectName}"
+  location            = local.rg_location
+  resource_group_name = local.rg_name
+  address_space       = ["10.0.0.0/16"]
+}}
 
-    # VPC
-    resource "aws_vpc" "vpc" {{
-    cidr_block = "10.0.0.0/16"
-    tags = {{
-        Name = "${{var.project_name}}-vm"
-        }}
-    }}
+resource "azurerm_subnet" "subnet" {{
+  name                 = "subnet-{projectName}"
+  resource_group_name  = local.rg_name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+}}
 
-    data "aws_availability_zones" "available" {{}}
+# Create public IPs for each VM
+resource "azurerm_public_ip" "public_ip" {{
+  for_each = {{ for vm in var.vm_resources : vm.id => vm }}
+  sku                 = "Standard"
+  name                = "publicip-${{each.value.name}}"
+  location            = local.rg_location
+  resource_group_name = local.rg_name
+  allocation_method   = "Static"
+}}
 
-    # Subnet
-    resource "aws_subnet" "subnet" {{
-    vpc_id                  = aws_vpc.vpc.id
-    cidr_block              = "10.0.1.0/24"
-    availability_zone       = data.aws_availability_zones.available.names[0]
-    map_public_ip_on_launch = true
-    tags = {{
-        Name = "${{var.project_name}}-vm"
-        }}
-    }}
+# Create NICs for each VM
+resource "azurerm_network_interface" "nic" {{
+  for_each = {{ for vm in var.vm_resources : vm.id => vm }}
 
-    # Internet Gateway
-    resource "aws_internet_gateway" "igw" {{
-    vpc_id = aws_vpc.vpc.id
-    tags = {{
-        Name = "${{var.project_name}}-vm"
-        }}
-    }}
+  name                = "nic-${{each.value.name}}"
+  location            = local.rg_location
+  resource_group_name = local.rg_name
 
-    # Route Table
-    resource "aws_route_table" "rt" {{
-    vpc_id = aws_vpc.vpc.id
+  ip_configuration {{
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.public_ip[each.key].id
+  }}
+}}
 
-    route {{
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.igw.id
-    }}
+# Create Linux VMs for each resource
+resource "azurerm_linux_virtual_machine" "vm" {{
+  for_each = {{ for vm in var.vm_resources : vm.id => vm }}
 
-    tags = {{
-        Name = "${{var.project_name}}-vm"
-        }}
-    }}
+  name                 = "${{each.value.name}}-vm"
+  resource_group_name  = local.rg_name
+  location             = local.rg_location
+  size                 = each.value.vmSize
+  admin_username       = "azureuser"
+  network_interface_ids = [
+    azurerm_network_interface.nic[each.key].id
+  ]
 
-    # Associate Route Table
-    resource "aws_route_table_association" "rta" {{
-    subnet_id      = aws_subnet.subnet.id
-    route_table_id = aws_route_table.rt.id
-    }}
+  admin_ssh_key {{
+    username   = "azureuser"
+    public_key = file(var.ssh_public_key_path[each.key])
+  }}
 
-    # Security Group
-    resource "aws_security_group" "sg" {{
-    name        = "{sg_name}"
-    description = "Allow SSH and HTTP"
-    vpc_id      = aws_vpc.vpc.id
+  os_disk {{
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }}
 
-    ingress {{
-        from_port   = 22
-        to_port     = 22
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }}
+  source_image_reference {{
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts"
+    version   = "latest"
+  }}
+}}
 
-    ingress {{
-        from_port   = 80
-        to_port     = 80
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }}
-
-    egress {{
-        from_port   = 0
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }}
-
-    tags = {{
-        Name = "${{var.project_name}}-vm"
-        }}
-    }}
-
-    resource "aws_key_pair" "vm_key" {{
-    key_name   = "{key_name}"
-    public_key = file(var.ssh_public_key_path)
-    }}
-
-    resource "aws_instance" "vm" {{
-    for_each               = {{for vm in var.vm_instances : vm.instance_name => vm }}
-    ami                    = data.aws_ami.ubuntu2204.id
-    instance_type          = each.value.instance_type
-    subnet_id              = aws_subnet.subnet.id
-    # Each VM can use its own SG if needed
-    vpc_security_group_ids = [aws_security_group.sg.id]
-    key_name               = aws_key_pair.vm_key.key_name
-
-    tags = {{
-        Name = each.value.instance_name
-        }}
-    }}
-
-
-    # Output the public IP
-    output "public_ip" {{
-    value = {{ for name, inst in aws_instance.vm : name => inst.public_ip }}
-    }}
-    """
+output "public_ip" {{
+  value = {{ for k, v in azurerm_public_ip.public_ip : k => v.ip_address }}
+}}
+"""
 
     with open(f"{terraform_dir}/main.tf", "w") as f:
         f.write(main_tf_content)
-    
+
     load_dotenv(expanduser('/opt/airflow/dags/.env'))
 
+    import ast
+    public_key_path = ast.literal_eval(public_key_path)
+    
+    ssh_key_map = {vm['id']: key for vm, key in zip(vm_resources, public_key_path)}
+
     variables_tf = f"""
-    variable "access_key" {{
-    default = "{os.getenv('AWS_ACCESS_KEY')}"
-    }}
+        variable "subscription_id" {{
+        default = "{os.getenv('AZURE_SUBSCRIPTION_ID')}"
+        }}
 
-    variable "secret_key" {{
-    default = "{os.getenv('AWS_SECRET_KEY')}"
-    }}
+        variable "client_id" {{
+        default = "{os.getenv('AZURE_CLIENT_ID')}"
+        }}
 
-    variable "project_location" {{
-    default = "{config_dict['region']}"
-    }}
+        variable "client_secret" {{
+        default = "{os.getenv('AZURE_CLIENT_SECRET')}"
+        }}
 
-    variable "ssh_public_key_path" {{
-    default = "{public_key_path}"
-    }}
+        variable "tenant_id" {{
+        default = "{os.getenv('AZURE_TENANT_ID')}"
+        }}
 
-    variable "project_name" {{
-    default = "{projectName}"
-    }}
+        variable "project_location" {{
+        default = "{config_dict['region']}"
+        }}
 
-   variable "vm_instances" {{
-    description = "List of VM configs"
-    type = list(object({{
-        instance_name = string
-        instance_type = string
-        key_name      = string
-        sg_name       = string
-    }}))
-    }}
+        variable "repoName" {{
+        default = "{projectName}"
+        }}
 
+        variable "ssh_public_key_path" {{
+        default = {json.dumps(ssh_key_map, indent=4)}
+        }}
+
+        variable "vm_resources" {{
+        type = list(map(any))
+        }}
     """
+
+
     with open(f"{terraform_dir}/variables.tf", "w") as f:
         f.write(variables_tf)
-    
-    # print(f"[x] Created Terraform files in {terraform_dir}")
+
+    print("[x] Terraform files written successfully for multiple VMs, NICs, and public IPs.")
+   
 
 def write_to_db(terraform_dir, configInfo):
     import ast
@@ -394,29 +371,38 @@ def write_to_db(terraform_dir, configInfo):
         vm_state = json.load(f)
 
     cursor.execute(
-        'UPDATE "AwsVMInstance" SET "terraformState" = %s WHERE "resourceConfigId" = %s;',
+        'UPDATE "AzureVMInstance" SET "terraformState" = %s WHERE "resourceConfigId" = %s;',
         (json.dumps(vm_state), resourceConfigId)
     )
-    vmInstances = configInfo["vm_instances"]
+    vmInstances = configInfo["vmInstances"]
     for i in range(len(vmInstances)):
         pem_path = Path(terraform_dir) / f"{repoName}_{i+1}.pem"
         if pem_path.exists():
             with open(pem_path, 'r') as f:
                 pem_content = f.read()
                 cursor.execute(
-                    'UPDATE "AwsVMInstance" SET "pem" = %s WHERE "id" = %s;',
-                    (pem_content, configInfo["vm_instances"][i][0])
+                    'UPDATE "AzureVMInstance" SET "pem" = %s WHERE "id" = %s;',
+                    (pem_content, configInfo["vmInstances"][i][0])
                 )
     connection.commit()
     cursor.close()
     connection.close()
 
+
+# -------------------------
+# DAG Definition
+# -------------------------
 with DAG(
-    'AWS_terraform_vm_provision',
+    'AZURE_terraform_vm_provision',
     default_args=default_args,
     schedule_interval=None,
     catchup=False,
 ) as dag:
+
+    # consume_task = PythonOperator(
+    #     task_id="consume_rabbitmq",
+    #     python_callable=rabbitmq_consumer,
+    # )
 
     fetch_task = PythonOperator(
         task_id="fetch_config",
@@ -434,7 +420,7 @@ with DAG(
         python_callable=generate_ssh_key,
         op_args=[
             "{{ ti.xcom_pull(task_ids='create_terraform_dir') }}",
-            "{{ ti.xcom_pull(task_ids='fetch_config')['project_name'] }}",
+            "{{ ti.xcom_pull(task_ids='fetch_config') }}",
         ],
     )
 
@@ -452,6 +438,20 @@ with DAG(
         task_id="terraform_init",
         bash_command="cd {{ ti.xcom_pull(task_ids='create_terraform_dir') }} && terraform init",
     )
+
+    # # Import RG if exists in Azure
+    # terraform_import = BashOperator(
+    #     task_id="terraform_import_rg",
+    #     bash_command=(
+    #         "cd {{ ti.xcom_pull(task_ids='create_terraform_dir') }} && "
+    #         "terraform import -no-color "
+    #         "azurerm_resource_group.rg "
+    #         '"/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-{{ ti.xcom_pull(task_ids=\'fetch_config\')[\'repoName\'] }}-{{ ti.xcom_pull(task_ids=\'fetch_config\')[\'resourcesId\'][:4] }}" || true'
+    #     ),
+    #     env={
+    #         "AZURE_SUBSCRIPTION_ID": os.getenv("AZURE_SUBSCRIPTION_ID", ""),
+    #     }
+    # )
 
     terraform_apply = BashOperator(
         task_id="terraform_apply",
