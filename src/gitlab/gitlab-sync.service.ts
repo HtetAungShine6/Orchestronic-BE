@@ -10,7 +10,8 @@ export class GitlabSyncService {
 
   constructor(private databaseService: DatabaseService) {}
 
-  //   @Cron('0 * * * *')
+  // @Cron('0 * * * *') // every hour
+  // @Cron('* * * * *') // every minute
   async syncRepositories() {
     try {
       this.logger.log('Starting GitLab repository sync...');

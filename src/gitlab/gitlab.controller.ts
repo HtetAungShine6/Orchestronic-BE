@@ -10,10 +10,14 @@ import {
 import { GitlabService } from './gitlab.service';
 import { CreateGitlabDto } from './dto/create-gitlab.dto';
 import { UpdateGitlabDto } from './dto/update-gitlab.dto';
+import { GitlabSyncService } from './gitlab-sync.service';
 
 @Controller('gitlab')
 export class GitlabController {
-  constructor(private readonly gitlabService: GitlabService) {}
+  constructor(
+    private readonly gitlabService: GitlabService,
+    private readonly gitlabSyncService: GitlabSyncService,
+  ) {}
 
   @Post()
   create(@Body() createGitlabDto: CreateGitlabDto) {
@@ -23,6 +27,11 @@ export class GitlabController {
   @Get()
   findAll() {
     return this.gitlabService.findAll();
+  }
+
+  @Get('sync')
+  sync() {
+    return this.gitlabSyncService.syncRepositories();
   }
 
   @Get(':id')

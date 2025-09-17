@@ -35,41 +35,44 @@ export class CloudProvidersService {
         maxMemory,
       } = params;
 
-      // 1️⃣ Fetch all items (or filter by search if you want)
-      let items = await this.databaseService.awsInstanceType.findMany({
-        where: {
-          raw: {
-            path: ['ProcessorInfo', 'SupportedArchitectures'],
-            array_contains: 'x86_64',
-          },
-        },
-      });
-
-      // 2️⃣ Filter in JS
-      items = items.filter((item) => {
-        const cpu =
-          typeof item.numberOfCores === 'number' ? item.numberOfCores : 0;
-        const memory =
-          typeof item.memoryInMB === 'number' ? item.memoryInMB : 0;
-        const name = item.id.toLowerCase();
-
-        if (search && !name.includes(search.toLowerCase())) return false;
-        if (minCores !== undefined && cpu < minCores) return false;
-        if (maxCores !== undefined && cpu > maxCores) return false;
-        if (minMemory !== undefined && memory < minMemory) return false;
-        if (maxMemory !== undefined && memory > maxMemory) return false;
-
-        return true;
-      });
-
-      // 3️⃣ Pagination
-      const total = items.length;
-      const totalPages = Math.ceil(total / limit);
       const skip = (page - 1) * limit;
-      const paginatedItems = items.slice(skip, skip + limit);
+
+      // Build Prisma filters
+      const where: any = {
+        raw: {
+          path: ['ProcessorInfo', 'SupportedArchitectures'],
+          array_contains: 'x86_64',
+        },
+      };
+
+      if (search) {
+        where.name = { contains: search, mode: 'insensitive' };
+      }
+      if (minCores !== undefined || maxCores !== undefined) {
+        where.numberOfCores = {};
+        if (minCores !== undefined) where.numberOfCores.gte = Number(minCores);
+        if (maxCores !== undefined) where.numberOfCores.lte = Number(maxCores);
+      }
+      if (minMemory !== undefined || maxMemory !== undefined) {
+        where.memoryInMB = {};
+        if (minMemory !== undefined) where.memoryInMB.gte = Number(minMemory);
+        if (maxMemory !== undefined) where.memoryInMB.lte = Number(maxMemory);
+      }
+
+      // Query with filters + pagination
+      const [items, total] = await this.databaseService.$transaction([
+        this.databaseService.awsInstanceType.findMany({
+          where,
+          skip,
+          take: Number(limit),
+        }),
+        this.databaseService.awsInstanceType.count({ where }),
+      ]);
+
+      const totalPages = Math.ceil(total / limit);
 
       return {
-        data: paginatedItems,
+        data: items,
         meta: {
           total,
           page,

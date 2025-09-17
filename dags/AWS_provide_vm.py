@@ -405,7 +405,7 @@ def write_to_db(terraform_dir, configInfo):
                 pem_content = f.read()
                 cursor.execute(
                     'UPDATE "AwsVMInstance" SET "pem" = %s WHERE "id" = %s;',
-                    (pem_content, configInfo["vmInstances"][i][0])
+                    (pem_content, configInfo["vm_instances"][i][0])
                 )
     connection.commit()
     cursor.close()

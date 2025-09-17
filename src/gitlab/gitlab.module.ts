@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { GitlabService } from './gitlab.service';
 import { GitlabController } from './gitlab.controller';
 import { DatabaseModule } from 'src/database/database.module';
+import { GitlabSyncService } from './gitlab-sync.service';
 
 @Module({
   imports: [DatabaseModule],
   controllers: [GitlabController],
-  providers: [GitlabService],
-  exports: [GitlabService],
+  providers: [GitlabService, GitlabSyncService],
+  exports: [GitlabService, GitlabSyncService],
 })
 export class GitlabModule {}
