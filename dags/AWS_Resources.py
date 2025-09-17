@@ -157,20 +157,6 @@ def create_terraform_directory(configInfo):
 # -------------------------
 # Step 4: Trigger VM or ST or DB
 # -------------------------
-# def checkVMSTDB(configInfo, resourceType):
-#     print(configInfo)
-#     vmCount = json.loads(configInfo).get('vmCount', 0)
-#     dbCount = json.loads(configInfo).get('dbCount', 0)
-#     stCount = json.loads(configInfo).get('stCount', 0)
-
-#     if resourceType == 'VM' and vmCount > 0:
-#         return True
-#     if resourceType == 'DB' and dbCount > 0:
-#         return True
-#     if resourceType == 'ST' and stCount > 0:
-#         return True
-#     return False
-
 def branch_resources(configInfo):
     data = json.loads(configInfo)
     branches = []
@@ -212,27 +198,6 @@ with DAG(
         task_id="create_tf_dir",
         python_callable=lambda ti: create_terraform_directory(ti.xcom_pull(task_ids="get_config_info")),
     )
-
-    # # check VM
-    # check_vm = PythonOperator(
-    #     task_id="check_vm",
-    #     python_callable=lambda ti: checkVMSTDB(ti.xcom_pull(task_ids="get_config_info"), 'VM'),
-    #     provide_context=True
-    # )
-
-    # #check DB
-    # check_db = PythonOperator(
-    #     task_id="check_db",
-    #     python_callable=lambda ti: checkVMSTDB(ti.xcom_pull(task_ids="get_config_info"), 'DB'),
-    #     provide_context=True
-    # )
-
-    # #check ST
-    # check_st = PythonOperator(
-    #     task_id="check_st",
-    #     python_callable=lambda ti: checkVMSTDB(ti.xcom_pull(task_ids="get_config_info"), 'ST'),
-    #     provide_context=True
-    # )
 
     branch_task = BranchPythonOperator(
         task_id='branch_resources',

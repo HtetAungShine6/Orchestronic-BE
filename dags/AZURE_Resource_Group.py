@@ -4,7 +4,7 @@ import ast
 import pika
 import psycopg2
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.empty import EmptyOperator
@@ -208,23 +208,18 @@ resource "azurerm_resource_group" "rg" {
 # -------------------------
 # Step 5: Trigger VM or ST or DB
 # -------------------------
-def checkVMSTDB(configInfo, resourceType):
-    print(configInfo)
-    vmCount = json.loads(configInfo).get('vmCount', 0)
-    dbCount = json.loads(configInfo).get('dbCount', 0)
-    stCount = json.loads(configInfo).get('stCount', 0)
-
-    if resourceType == 'VM':
-        if vmCount > 0:
-            return True
-    if resourceType == 'DB':
-        if dbCount > 0:
-            return True
-    if resourceType == 'ST':
-        if stCount > 0:
-            return True
-    return False
-
+def branch_resources(configInfo):
+    data = json.loads(configInfo)
+    branches = []
+    if data['vmCount'] > 0:
+        branches.append('trigger_vm')
+    if data['dbCount'] > 0:
+        branches.append('trigger_db')
+    if data['stCount'] > 0:
+        branches.append('trigger_st')
+    if not branches:
+        return 'end'
+    return branches
 # -------------------------
 # Airflow DAG
 # -------------------------
@@ -274,25 +269,9 @@ with DAG(
         """,
     )
 
-    # check VM
-    check_vm = PythonOperator(
-        task_id="check_vm",
-        python_callable=lambda ti: checkVMSTDB(ti.xcom_pull(task_ids="get_config_info"), 'VM'),
-        provide_context=True
-    )
-
-    #check DB
-    check_db = PythonOperator(
-        task_id="check_db",
-        python_callable=lambda ti: checkVMSTDB(ti.xcom_pull(task_ids="get_config_info"), 'DB'),
-        provide_context=True
-    )
-
-    #check ST
-    check_st = PythonOperator(
-        task_id="check_st",
-        python_callable=lambda ti: checkVMSTDB(ti.xcom_pull(task_ids="get_config_info"), 'ST'),
-        provide_context=True
+    branch_task = BranchPythonOperator(
+        task_id='branch_resources',
+        python_callable=lambda ti: branch_resources(ti.xcom_pull(task_ids='get_config_info'))
     )
 
     # Trigger VM DAG
@@ -325,8 +304,4 @@ with DAG(
     end = EmptyOperator(task_id="end")
 
     # Workflow
-    get_request_id >> get_config_info >> create_tf_dir >> write_tf_files >> terraform_apply >> [check_vm, check_db, check_st]
-    check_vm >> trigger_vm
-    check_db >> trigger_db
-    check_st >> trigger_st
-    [trigger_vm, trigger_db, trigger_st] >> end
+    get_request_id >> get_config_info >> create_tf_dir >> write_tf_files >> terraform_apply >> branch_task >> [trigger_vm, trigger_db, trigger_st] >> end

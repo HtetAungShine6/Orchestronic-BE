@@ -305,7 +305,7 @@ def write_terraform_files(terraform_dir, configInfo, public_key_path):
     key_name               = aws_key_pair.vm_key.key_name
 
     tags = {{
-        Name = "${{var.instance_name}}"
+        Name = each.value.instance_name
         }}
     }}
 
