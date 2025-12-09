@@ -8,20 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// model Airflow {
-//   id            String    @id @default(uuid())
-//   dagId         String    @unique
-//   dagRunId      String    @unique
-//   status        String
-//   executionDate DateTime
-//   startDate     DateTime?
-//   endDate       DateTime?
-//   conf          Json?
-//   lastUpdated   DateTime  @updatedAt
-//   createdAt     DateTime  @default(now())
-//   Request       Request?
-// }
-
 model Request {
   id           String     @id @default(uuid())
   status       Status     @default(Pending)
@@ -36,8 +22,6 @@ model Request {
   owner        User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   resources    Resources  @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
-  // airflowId    String     @unique
-  // airflow      Airflow    @relation(fields: [airflowId], references: [id], onDelete: Cascade)
 }
 
 model Repository {
@@ -56,9 +40,9 @@ model Repository {
 model Resources {
   id               String         @id @default(uuid())
   name             String
-  cloudProvider    CloudProvider
   region           String
   resourceConfigId String         @unique
+  cloudProvider    CloudProvider
   repository       Repository?
   request          Request?
   resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
@@ -66,15 +50,17 @@ model Resources {
 
 model ResourceConfig {
   id              String                  @id @default(uuid())
-  AzureDatabase   AzureDatabaseInstance[]
-  resources       Resources?
-  AzureStorage    AzureStorageInstance[]
-  AzureVMInstance AzureVMInstance[]
-  AwsVMInstance   AwsVMInstance[]
-  AwsStorage      AwsStorageInstance[]
-  AwsDatabase     AwsDatabaseInstance[]
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
+  AwsDatabase     AwsDatabaseInstance[]
+  AwsK8sCluster   AwsK8sCluster[]
+  AwsStorage      AwsStorageInstance[]
+  AwsVMInstance   AwsVMInstance[]
+  AzureDatabase   AzureDatabaseInstance[]
+  AzureK8sCluster AzureK8sCluster[]
+  AzureStorage    AzureStorageInstance[]
+  AzureVMInstance AzureVMInstance[]
+  resources       Resources?
 }
 
 model AzureDatabaseInstance {
@@ -101,11 +87,51 @@ model AzureStorageInstance {
   resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
 }
 
+model AzureK8sCluster {
+  id               String          @id @default(uuid())
+  clusterName      String
+  nodeCount        Int             @default(3)
+  nodeSize         String          @default("Standard_D2s_v3")
+  kubeConfig       String?
+  clusterFqdn      String?
+  terraformState   Json?
+  resourceConfigId String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  resourceConfig   ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+  deployments      K8sDeployment[]
+  services         K8sService[]
+
+  @@index([resourceConfigId])
+}
+
+model AzureAksNodeType {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  numberOfCores Int
+  memoryInMB    Int
+  description   String?
+  raw           Json?
+  createdAt     DateTime @default(now())
+}
+
+model AzurePolicyK8s {
+  id                 String   @id @default(uuid())
+  maxNodeCount       Int      @default(10)
+  maxClustersPerUser Int      @default(5)
+  allowedNodeTypes   Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 model User {
   id                     String                   @id @default(uuid())
   name                   String
   email                  String                   @unique
   role                   Role
+  gitlabUrl              String?
+  gitlabName             String?
+  gitlabId               Int?
   CloudResourceSecret    CloudResourceSecret[]
   RepositoryCollaborator RepositoryCollaborator[]
   request                Request[]
@@ -117,48 +143,121 @@ model AzureVMInstance {
   id               String         @id @default(uuid())
   name             String
   os               String
+  resourceConfigId String
   sizeId           String
   terraformState   Json?
   pem              String?
-  size             AzureVMSize    @relation(fields: [sizeId], references: [id], onDelete: Cascade)
-  resourceConfigId String
   resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+  size             AzureVMSize    @relation(fields: [sizeId], references: [id], onDelete: Cascade)
 }
 
 model AwsVMInstance {
   id                String          @id @default(uuid())
-  instanceName      String
   os                String
+  resourceConfigId  String
+  awsInstanceTypeId String
+  instanceName      String
   keyName           String
   sgName            String
-  resourceConfigId  String
   terraformState    Json?
   pem               String?
-  ResourceConfig    ResourceConfig  @relation(fields: [resourceConfigId], references: [id])
-  awsInstanceTypeId String
   AwsInstanceType   AwsInstanceType @relation(fields: [awsInstanceTypeId], references: [id])
+  ResourceConfig    ResourceConfig  @relation(fields: [resourceConfigId], references: [id])
 }
 
 model AwsDatabaseInstance {
   id                 String          @id @default(uuid())
-  dbName             String
-  dbUsername         String
-  dbPassword         String
-  awsDatabaseTypeId  String
-  dbInstanceClass    AwsDatabaseType @relation(fields: [awsDatabaseTypeId], references: [id])
-  dbAllocatedStorage Int
-  engine             Engine
-  terraformState     Json?
   resourceConfigId   String
+  dbAllocatedStorage Int
+  dbName             String
+  dbPassword         String
+  dbUsername         String
+  engine             Engine
+  awsDatabaseTypeId  String
+  terraformState     Json?
+  dbInstanceClass    AwsDatabaseType @relation(fields: [awsDatabaseTypeId], references: [id])
   resourceConfig     ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
 }
 
 model AwsStorageInstance {
   id               String         @id @default(uuid())
-  bucketName       String
   resourceConfigId String
+  bucketName       String
   terraformState   Json?
   resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+}
+
+model AwsK8sCluster {
+  id               String          @id @default(uuid())
+  clusterName      String
+  nodeCount        Int             @default(3)
+  nodeSize         String          @default("t3.medium")
+  kubeConfig       String?
+  clusterEndpoint  String?
+  terraformState   Json?
+  resourceConfigId String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  resourceConfig   ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+  deployments      K8sDeployment[]
+  services         K8sService[]
+
+  @@index([resourceConfigId])
+}
+
+model AwsEksNodeType {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  numberOfCores Int
+  memoryInMB    Int
+  description   String?
+  raw           Json?
+  createdAt     DateTime @default(now())
+}
+
+model AwsPolicyK8s {
+  id                 String   @id @default(uuid())
+  maxNodeCount       Int      @default(10)
+  maxClustersPerUser Int      @default(5)
+  allowedNodeTypes   Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model K8sDeployment {
+  id              String           @id @default(uuid())
+  name            String
+  image           String
+  replicas        Int              @default(3)
+  port            Int              @default(80)
+  environmentVars Json?
+  awsClusterId    String?
+  azureClusterId  String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  awsCluster      AwsK8sCluster?   @relation(fields: [awsClusterId], references: [id], onDelete: Cascade)
+  azureCluster    AzureK8sCluster? @relation(fields: [azureClusterId], references: [id], onDelete: Cascade)
+
+  @@index([awsClusterId])
+  @@index([azureClusterId])
+}
+
+model K8sService {
+  id             String           @id @default(uuid())
+  name           String
+  type           String           @default("LoadBalancer")
+  port           Int              @default(80)
+  targetPort     Int              @default(80)
+  appSelector    String
+  awsClusterId   String?
+  azureClusterId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  awsCluster     AwsK8sCluster?   @relation(fields: [awsClusterId], references: [id], onDelete: Cascade)
+  azureCluster   AzureK8sCluster? @relation(fields: [azureClusterId], references: [id], onDelete: Cascade)
+
+  @@index([awsClusterId])
+  @@index([azureClusterId])
 }
 
 model ownedRepository {
@@ -172,7 +271,8 @@ model ownedRepository {
 
 model RepositoryCollaborator {
   userId       String
-  repositoryId String
+  gitlabUserId Int        @default(0)
+  repositoryId String  
   assignedAt   DateTime   @default(now())
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -222,8 +322,8 @@ model AzurePolicyStorage {
 
 model AwsPolicyVM {
   id            String @id @default(uuid())
-  name          String
   memoryInMB    Int
+  name          String
   numberOfCores Int
 }
 
@@ -238,11 +338,11 @@ model AwsPolicyStorage {
 }
 
 model AwsInstanceType {
+  raw           Json
   id            String          @id @default(uuid())
+  memoryInMB    Int
   name          String          @unique
   numberOfCores Int
-  memoryInMB    Int
-  raw           Json
   AwsVMInstance AwsVMInstance[]
 }
 

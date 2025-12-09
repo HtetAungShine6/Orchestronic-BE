@@ -97,6 +97,75 @@ export class UserController {
     }
   }
 
+  @Patch('me/gitlab-url')
+  @ApiOperation({
+    summary: 'Add or update GitLab URL for the authenticated user',
+  })
+  async updateGitlabUrl(
+    @Body('gitlabUrl') gitlabUrl: string,
+    @Request() req: RequestWithCookies,
+  ) {
+    const token = req.cookies?.['access_token'];
+    if (!token) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as BackendJwtPayload;
+
+      if (!decoded || !decoded.email) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      if (
+        decoded.role !== 'Admin' &&
+        decoded.role !== 'IT' &&
+        decoded.role !== 'Developer'
+      ) {
+        throw new ForbiddenException(
+          'You do not have permission to update GitLab URL',
+        );
+      }
+
+      return this.userService.addGitlabUrl(decoded.id, gitlabUrl);
+    } catch (err) {
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
+
+  @Get('me/gitlab-url')
+  @ApiOperation({
+    summary: 'Get GitLab URL for the authenticated user',
+  })
+  async getGitlabUrl(@Request() req: RequestWithCookies) {
+    const token = req.cookies?.['access_token'];
+    if (!token) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as BackendJwtPayload;
+
+      if (!decoded || !decoded.email) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      return this.userService.getGitlabUrl(decoded.id);
+    } catch (err) {
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
+
   @Get('by-email')
   @ApiOperation({
     summary: 'Find users by email',

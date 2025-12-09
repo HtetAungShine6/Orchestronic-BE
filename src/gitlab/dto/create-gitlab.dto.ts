@@ -15,13 +15,4 @@ export class CreateGitlabDto {
   })
   @IsString()
   description: string;
-
-  @ApiProperty({
-    example: 'private',
-    description: 'Visibility level of the project',
-    enum: ['private', 'internal', 'public'],
-  })
-  @IsString()
-  @IsIn(['private', 'internal', 'public'])
-  visibility: 'private' | 'internal' | 'public';
 }

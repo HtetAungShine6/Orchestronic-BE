@@ -1,6 +1,14 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Matches,
+} from 'class-validator';
 import { Role } from '@prisma/client';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -29,4 +37,28 @@ export class CreateUserDto {
   })
   @IsEnum(Role)
   role: Role;
+
+  @ApiPropertyOptional({
+    description: 'Optional GitLab Profile URL',
+    example: 'https://gitlab.com/username',
+  })
+  @IsOptional()
+  @Matches(/^http?:\/\/[A-Za-z0-9.-]+(?::\d+)?\/[A-Za-z0-9._-]+\/?$/, {
+    message: 'Invalid GitLab URL format',
+  })
+  gitlabUrl?: string
+  
+  @ApiPropertyOptional({
+    description: 'Optional GitLab Name',
+    example: 'gitlab_username',
+  })
+  @IsOptional()
+  gitlabName?: string;;
+
+  @ApiPropertyOptional({
+    description: 'Optional GitLab Id',
+    example: '4',
+  })
+  @IsOptional()
+  gitlabId?: number;;
 }

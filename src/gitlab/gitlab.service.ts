@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateGitlabDto } from './dto/create-gitlab.dto';
 import { UpdateGitlabDto } from './dto/update-gitlab.dto';
 
@@ -17,7 +17,61 @@ export class GitlabService {
       body: JSON.stringify({
         name: createGitlabDto.name,
         description: createGitlabDto.description,
-        visibility: createGitlabDto.visibility,
+        // visibility: createGitlabDto.visibility,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab API error: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  async getUserByUsername(username: string) {
+    const response = await fetch(
+      `${this.gitlabUrl}/users?username=${username}`,
+      {
+        headers: { 'PRIVATE-TOKEN': this.token! },
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab API error: ${error}`);
+    }
+
+    const users = await response.json();
+
+    if (!Array.isArray(users) || users.length === 0) {
+      throw new NotFoundException(`GitLab user '${username}' not found`);
+    }
+
+    return users[0];
+  }
+
+  async createProjectForAUser(
+    username: string,
+    createGitlabDto: CreateGitlabDto,
+  ) {
+    // Step 1: Look up GitLab user by username
+    const gitlabUser = await this.getUserByUsername(username);
+
+    // Step 2: extract numeric GitLab userId
+    const userId = gitlabUser.id;
+
+    // Step 3: create the project under that user
+    const response = await fetch(`${this.gitlabUrl}/projects/user/${userId}`, {
+      method: 'POST',
+      headers: {
+        'PRIVATE-TOKEN': this.token!,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: createGitlabDto.name,
+        description: createGitlabDto.description,
+        visibility: 'public',
       }),
     });
 
@@ -59,5 +113,104 @@ export class GitlabService {
       method: 'DELETE',
       headers: { 'PRIVATE-TOKEN': this.token! },
     });
+  }
+
+  async listUsers() {
+    const response = await fetch(`${this.gitlabUrl}/users`, {
+      method: 'GET',
+      headers: {
+        'PRIVATE-TOKEN': this.token!,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab API error: ${error}`);
+    }
+
+    const users = await response.json();
+
+    // Remove bots + admin accounts
+    return users.filter((u: any) => !u.bot && !u.is_admin);
+  }
+
+  async approveUser(userId: number) {
+    const response = await fetch(`${this.gitlabUrl}/users/${userId}/approve`, {
+      method: 'POST',
+      headers: {
+        'PRIVATE-TOKEN': this.token!,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab API error: ${error}`);
+    }
+
+    return response.text();
+  }
+
+  async rejectUser(userId: number) {
+    // Implement with your chosen GitLab endpoint (reject/block/delete)
+    const response = await fetch(`${this.gitlabUrl}/users/${userId}/reject`, {
+      method: 'POST',
+      headers: {
+        'PRIVATE-TOKEN': this.token!,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab API error: ${error}`);
+    }
+
+    return response.text();
+  }
+
+  async getProjectByName(name: string) {
+    const response = await fetch(
+      `${this.gitlabUrl}/projects?search=${encodeURIComponent(name)}`,
+      {
+        method: 'GET',
+        headers: {
+          'PRIVATE-TOKEN': this.token!,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab API error: ${error}`);
+    }
+
+    const projects = await response.json();
+    return projects[0] ?? null; 
+  }
+
+  async inviteUserToProject(projectId: number, gitlabUserId: number) {
+    const response = await fetch(
+      `${this.gitlabUrl}/projects/${projectId}/members`,
+      {
+        method: 'POST',
+        headers: {
+          'PRIVATE-TOKEN': this.token!,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `user_id=${gitlabUserId}&access_level=30`,
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(
+        `Failed to invite GitLab user ${gitlabUserId} to project ${projectId}: ${error}`,
+      );
+    }
+
+    return response.json();
   }
 }

@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsArray,
   ValidateNested,
+  IsNumberString,
+  IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -16,6 +18,14 @@ export class CollaboratorDto {
     description: 'ID of the collaborator',
   })
   userId: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  @ApiProperty({
+    example: 12345,
+    description: 'GitLab user ID of the collaborator',
+  })
+  gitlabUserId: number;
 }
 
 export class CreateRepositoryDto {

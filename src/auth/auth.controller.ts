@@ -126,6 +126,10 @@ export class AuthController {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
     });
-    return { message: 'Logged out' };
+
+    const tenantId = process.env.AZURE_AD_TENANT_ID;
+    const redirectUri = encodeURIComponent(process.env.FRONTEND_URL + '/');
+    const logoutUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${redirectUri}`;
+    return { message: 'Logged out', logoutUrl };
   }
 }

@@ -123,24 +123,24 @@ export class InfrastructureService {
       },
     });
 
-    const gitlabRepoId: Array<{ id: number; name: string; path: string }> =
-      await this.gitlabService.findOne(request?.repository.name || '');
+    // const gitlabRepoId: Array<{ id: number; name: string; path: string }> =
+    //   await this.gitlabService.findOne(request?.repository.name || '');
 
-    const gitlabRepo = gitlabRepoId.find(
-      (repo) =>
-        repo.id &&
-        repo.name === request?.repository.name &&
-        repo.path === request?.repository.name,
-    );
+    // const gitlabRepo = gitlabRepoId.find(
+    //   (repo) =>
+    //     repo.id &&
+    //     repo.name === request?.repository.name &&
+    //     repo.path === request?.repository.name,
+    // );
 
-    if (
-      gitlabRepo?.id &&
-      gitlabRepo?.name === request?.repository.name &&
-      gitlabRepo?.path === request?.repository.name
-    ) {
-      console.log(`Deleting GitLab repo with ID: ${gitlabRepo?.id}`);
-      await this.gitlabService.remove(gitlabRepo?.id);
-    }
+    // if (
+    //   gitlabRepo?.id &&
+    //   gitlabRepo?.name === request?.repository.name &&
+    //   gitlabRepo?.path === request?.repository.name
+    // ) {
+    //   console.log(`Deleting GitLab repo with ID: ${gitlabRepo?.id}`);
+    //   await this.gitlabService.remove(gitlabRepo?.id);
+    // }
 
     if (!request?.resourcesId) {
       throw new Error(`No resourcesId found for request ${id}`);

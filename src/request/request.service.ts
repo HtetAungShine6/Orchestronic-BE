@@ -55,6 +55,20 @@ export class RequestService {
           select: {
             id: true,
             name: true,
+            RepositoryCollaborator: {
+              select: {
+                userId: true,
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    gitlabUrl: true,
+                    gitlabId: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -149,7 +163,10 @@ export class RequestService {
         resources: { connect: { id: newResource.id } },
         RepositoryCollaborator: {
           create:
-            repository.collaborators?.map((c) => ({ userId: c.userId })) || [],
+            repository.collaborators?.map((c) => ({
+              userId: c.userId,
+              gitlabUserId: c.gitlabUserId,
+            })) || [],
         },
       },
     });
@@ -266,7 +283,10 @@ export class RequestService {
         resources: { connect: { id: newResource.id } },
         RepositoryCollaborator: {
           create:
-            repository.collaborators?.map((c) => ({ userId: c.userId })) || [],
+            repository.collaborators?.map((c) => ({
+              userId: c.userId,
+              gitlabUserId: c.gitlabUserId,
+            })) || [],
         },
       },
     });
@@ -315,74 +335,124 @@ export class RequestService {
     id: string,
     status: RequestStatus,
   ) {
+    // 1️⃣ Update request status first
     const updateStatus = await this.databaseService.request.update({
-      where: { id: id.toString() },
+      where: { id },
       data: { status },
       include: {
         repository: true,
+        owner: true,
       },
     });
 
-    // TODO: Fetch data from DB to see how many resources of each type were requested
-    if (updateStatus.status === RequestStatus.Approved) {
-      const request = await this.databaseService.request.findFirst({
-        where: { id: id.toString() },
-        select: {
-          resourcesId: true,
-        },
-      });
-
-      if (!request?.resourcesId) {
-        throw new Error(`No resourcesId found for request ${id}`);
-      }
-
-      const result = await this.databaseService.resources.findFirst({
-        where: { id: request?.resourcesId },
-        select: {
-          cloudProvider: true,
-        },
-      });
-
-      const cloudProvider = result?.cloudProvider;
-
-      if (!cloudProvider) {
-        throw new Error(
-          `No cloudProvider found for resourcesId ${request?.resourcesId}`,
-        );
-      }
-
-      // Fetch the repository to get its name and description
-      const repository = await this.databaseService.repository.findUnique({
-        where: { id: updateStatus.repository.id },
-        select: {
-          name: true,
-          description: true,
-        },
-      });
-
-      await this.gitlabService.createProject({
-        name: repository?.name ?? '',
-        description: repository?.description ?? '',
-        visibility: 'public',
-      });
-
-      await this.databaseService.repository.update({
-        where: { id: updateStatus.repository.id },
-        data: {
-          status: RepositoryStatus.Created,
-        },
-      });
-
-      if (cloudProvider == CloudProvider.AWS) {
-        this.rabbitmqService.queueRequest(id.toString());
-        this.airflowService.triggerDag(user, 'AWS_Resources');
-      } else if (cloudProvider == CloudProvider.AZURE) {
-        this.rabbitmqService.queueRequest(id.toString());
-        this.airflowService.triggerDag(user, 'AZURE_Resource_Group');
-      } else {
-        throw new Error(`Unsupported cloudProvider: ${cloudProvider}`);
-      }
+    // If not approved → stop here
+    if (updateStatus.status !== RequestStatus.Approved) {
+      return updateStatus;
     }
+
+    // 2️⃣ Fetch resourcesId
+    const requestEntry = await this.databaseService.request.findUniqueOrThrow({
+      where: { id },
+      select: { resourcesId: true },
+    });
+
+    if (!requestEntry.resourcesId) {
+      throw new Error(`No resourcesId found for request ${id}`);
+    }
+
+    // 3️⃣ Fetch cloud provider
+    const resourceInfo = await this.databaseService.resources.findUniqueOrThrow(
+      {
+        where: { id: requestEntry.resourcesId },
+        select: { cloudProvider: true },
+      },
+    );
+
+    const cloudProvider = resourceInfo.cloudProvider;
+
+    // 4️⃣ Get repository + collaborators (with gitlabUserId!)
+    const repository = await this.databaseService.repository.findUniqueOrThrow({
+      where: { id: updateStatus.repository.id },
+      select: {
+        name: true,
+        description: true,
+        RepositoryCollaborator: {
+          select: {
+            gitlabUserId: true,
+            userId: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                gitlabId: true,
+                gitlabUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // 5️⃣ Get owner's GitLab username
+    const gitlabOwner = await this.databaseService.user.findUniqueOrThrow({
+      where: { id: updateStatus.owner.id },
+      select: { gitlabName: true },
+    });
+
+    // 6️⃣ Create GitLab project under owner namespace
+    await this.gitlabService.createProjectForAUser(
+      gitlabOwner.gitlabName ?? '',
+      {
+        name: repository.name,
+        description: repository.description ?? '',
+      },
+    );
+
+    // 7️⃣ Fetch created GitLab project to get its ID
+    const project = await this.gitlabService.getProjectByName(repository.name);
+    if (!project) {
+      throw new Error(
+        `GitLab project not found after creation: ${repository.name}`,
+      );
+    }
+
+    const projectId = project.id;
+
+    // 8️⃣ Invite collaborators (gitlabUserId OR fallback to user.gitlabId)
+    for (const collaborator of repository.RepositoryCollaborator) {
+      const gitlabId =
+        collaborator.gitlabUserId && collaborator.gitlabUserId > 0
+          ? collaborator.gitlabUserId
+          : collaborator.user.gitlabId;
+
+      if (!gitlabId || gitlabId <= 0) {
+        console.warn(
+          `Skipping collaborator ${collaborator.userId} — invalid GitLab ID (gitlabUserId=${collaborator.gitlabUserId}, user.gitlabId=${collaborator.user.gitlabId})`,
+        );
+        continue;
+      }
+
+      await this.gitlabService.inviteUserToProject(projectId, gitlabId);
+    }
+
+    // 9️⃣ Update repository status → Created
+    await this.databaseService.repository.update({
+      where: { id: updateStatus.repository.id },
+      data: { status: RepositoryStatus.Created },
+    });
+
+    // 🔟 Trigger CI/CD + cloud provisioning
+    if (cloudProvider === CloudProvider.AWS) {
+      this.rabbitmqService.queueRequest(id);
+      this.airflowService.triggerDag(user, 'AWS_Resources');
+    } else if (cloudProvider === CloudProvider.AZURE) {
+      this.rabbitmqService.queueRequest(id);
+      this.airflowService.triggerDag(user, 'AZURE_Resource_Group');
+    } else {
+      throw new Error(`Unsupported cloudProvider: ${cloudProvider}`);
+    }
+
     return updateStatus;
   }
 

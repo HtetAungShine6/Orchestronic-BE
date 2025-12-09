@@ -10,7 +10,7 @@ import { RabbitmqService } from './rabbitmq.service';
         name: 'RABBITMQ_SERVICE_1',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://localhost:5672'],
+          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
           queue: 'request',
         },
       },
@@ -18,7 +18,7 @@ import { RabbitmqService } from './rabbitmq.service';
         name: 'RABBITMQ_SERVICE_2',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://localhost:5672'],
+          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
           queue: 'destroy',
         },
       },
