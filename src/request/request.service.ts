@@ -142,6 +142,9 @@ export class RequestService {
         AzureStorage: {
           create: resources.resourceConfig.sts || [],
         },
+        AzureK8sCluster: {
+          create: resources.resourceConfig.aks || [],
+        },
       },
     });
 
@@ -198,6 +201,7 @@ export class RequestService {
                 AzureVMInstance: true,
                 AzureDatabase: true,
                 AzureStorage: true,
+                AzureK8sCluster: true,
               },
             },
           },
