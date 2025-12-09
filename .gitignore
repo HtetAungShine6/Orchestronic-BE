@@ -58,3 +58,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /dags/__pycache__
 /dags/terraform
 venv
+.env
