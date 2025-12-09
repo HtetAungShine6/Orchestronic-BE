@@ -18,6 +18,7 @@ export class AzureStrategy extends PassportStrategy(OIDCStrategy, 'azure-ad') {
       allowHttpForRedirectUrl: true,
       passReqToCallback: false,
       scope: ['profile', 'email', 'openid'],
+      prompt: 'select_account',
     });
   }
 

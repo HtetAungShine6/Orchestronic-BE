@@ -45,33 +45,60 @@ export class AuthController {
   @UseGuards(AuthGuard('azure-ad'))
   azureCallback(@Req() req, @Res() res: Response) {
     const isProd = process.env.NODE_ENV === 'production';
-    console.log('Req.user:', req.user);
-    const user = req.user;
 
-    // Issue short-lived JWT
-    // Issue short-lived access token
-    const accessToken = this.jwt.sign(user, { expiresIn: '1h' });
+    try {
+      console.log('Azure callback - Req.user:', req.user);
+      const user = req.user;
 
-    // Issue refresh token (store in DB or cache with expiration)
-    const refreshToken = this.jwt.sign({ id: user.id }, { expiresIn: '7d' });
+      if (!user || !user.id || !user.email) {
+        console.error('Invalid user data from Azure AD:', user);
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/login?error=invalid_user`,
+        );
+      }
 
-    // Save tokens in HTTP-only cookies
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 60 * 60 * 1000, // 1 hour
-    });
+      // Create JWT payload with all required fields
+      const jwtPayload = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      };
 
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+      // Issue short-lived access token
+      const accessToken = this.jwt.sign(jwtPayload, { expiresIn: '1h' });
 
-    // Redirect to frontend
-    return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+      // Issue refresh token
+      const refreshToken = this.jwt.sign({ id: user.id }, { expiresIn: '7d' });
+
+      // Set cookies with proper configuration
+      const cookieOptions = {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: isProd ? ('none' as const) : ('lax' as const),
+        path: '/',
+      };
+
+      res.cookie('access_token', accessToken, {
+        ...cookieOptions,
+        maxAge: 60 * 60 * 1000, // 1 hour
+      });
+
+      res.cookie('refresh_token', refreshToken, {
+        ...cookieOptions,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      console.log('Cookies set successfully, redirecting to dashboard');
+
+      // Redirect to frontend dashboard
+      return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+    } catch (error) {
+      console.error('Error in Azure callback:', error);
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/login?error=auth_failed`,
+      );
+    }
   }
 
   @Post('refresh')
@@ -112,36 +139,17 @@ export class AuthController {
     }
   }
 
-  // @Post('logout')
-  // logout(@Res({ passthrough: true }) res: Response) {
-  //   const isProd = process.env.NODE_ENV === 'production';
-
-  //   res.clearCookie('refresh_token', {
-  //     httpOnly: true,
-  //     secure: isProd,
-  //     sameSite: isProd ? 'none' : 'lax',
-  //   });
-  //   res.clearCookie('access_token', {
-  //     httpOnly: true,
-  //     secure: isProd,
-  //     sameSite: isProd ? 'none' : 'lax',
-  //   });
-
-  //   const tenantId = process.env.AZURE_AD_TENANT_ID;
-  //   const redirectUri = encodeURIComponent(process.env.FRONTEND_URL + '/');
-  //   const logoutUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${redirectUri}`;
-  //   return { message: 'Logged out', logoutUrl };
-  // }
-
+  // Backend: auth.controller.ts
   @Post('logout')
   logout(@Res() res: Response) {
     const isProd = process.env.NODE_ENV === 'production';
 
+    // Clear application cookies
     res.clearCookie('access_token', {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
-      path: '/', // MUST match original cookie
+      path: '/',
     });
 
     res.clearCookie('refresh_token', {
@@ -151,11 +159,17 @@ export class AuthController {
       path: '/',
     });
 
-    // Azure AD logout
+    // Azure AD logout with prompt parameter
     const tenantId = process.env.AZURE_AD_TENANT_ID;
     const redirectUri = encodeURIComponent(process.env.FRONTEND_URL + '/login');
+
+    // Add prompt=select_account to the redirect URI so after Azure logout,
+    // users will see account picker on next login
     const logoutUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${redirectUri}`;
 
-    return res.status(200).json({ message: 'Logged out', logoutUrl });
+    return res.status(200).json({
+      message: 'Logged out',
+      logoutUrl,
+    });
   }
 }
