@@ -3,6 +3,7 @@ import { CreateAzureDatabaseInstanceDto } from './db-instance-azure.dto';
 import { CreateAzureStorageInstanceDto } from './storage-instance-azure.dto';
 import { CreateAzureVMInstanceDto } from './vm-instance-azure.dto';
 import { IsArray, IsOptional } from 'class-validator';
+import { CreateAzureK8sClusterDto } from './k8s-cluster-azure.dto';
 
 export class CreateResourceAzureConfigDto {
   @ApiProperty({
@@ -28,4 +29,12 @@ export class CreateResourceAzureConfigDto {
   @IsOptional()
   @IsArray()
   sts: CreateAzureStorageInstanceDto[];
+
+  @ApiProperty({
+    type: [CreateAzureK8sClusterDto],
+    description: 'List of AKS clusters to be created',
+  })
+  @IsOptional()
+  @IsArray()
+  aks: CreateAzureK8sClusterDto[];
 }
