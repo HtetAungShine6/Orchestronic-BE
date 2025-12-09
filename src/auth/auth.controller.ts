@@ -112,24 +112,50 @@ export class AuthController {
     }
   }
 
+  // @Post('logout')
+  // logout(@Res({ passthrough: true }) res: Response) {
+  //   const isProd = process.env.NODE_ENV === 'production';
+
+  //   res.clearCookie('refresh_token', {
+  //     httpOnly: true,
+  //     secure: isProd,
+  //     sameSite: isProd ? 'none' : 'lax',
+  //   });
+  //   res.clearCookie('access_token', {
+  //     httpOnly: true,
+  //     secure: isProd,
+  //     sameSite: isProd ? 'none' : 'lax',
+  //   });
+
+  //   const tenantId = process.env.AZURE_AD_TENANT_ID;
+  //   const redirectUri = encodeURIComponent(process.env.FRONTEND_URL + '/');
+  //   const logoutUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${redirectUri}`;
+  //   return { message: 'Logged out', logoutUrl };
+  // }
+
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
+  logout(@Res() res: Response) {
     const isProd = process.env.NODE_ENV === 'production';
+
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      path: '/', // MUST match original cookie
+    });
 
     res.clearCookie('refresh_token', {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
-    });
-    res.clearCookie('access_token', {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      path: '/',
     });
 
+    // Azure AD logout
     const tenantId = process.env.AZURE_AD_TENANT_ID;
-    const redirectUri = encodeURIComponent(process.env.FRONTEND_URL + '/');
+    const redirectUri = encodeURIComponent(process.env.FRONTEND_URL + '/login');
     const logoutUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${redirectUri}`;
-    return { message: 'Logged out', logoutUrl };
+
+    return res.status(200).json({ message: 'Logged out', logoutUrl });
   }
 }
