@@ -24,12 +24,29 @@ model Request {
   resources    Resources  @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
 }
 
+model ClusterRequest {
+  id           String      @id @default(uuid())
+  status       Status      @default(Pending)
+  description  String
+  resourcesId  String?     @unique
+  repositoryId String?     @unique
+  ownerId      String
+  createdAt    DateTime    @default(now())
+  displayCode  String      @unique
+  updatedAt    DateTime    @updatedAt
+  feedback     String?
+  owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  repository   Repository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  resources    Resources?  @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
+}
+
 model Repository {
   id                     String                   @id @default(cuid())
   name                   String                   @unique
   description            String?
   resourcesId            String                   @unique
   status                 RepositoryStatus         @default(Pending)
+  clusterRequests        ClusterRequest?
   resources              Resources                @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
   RepositoryCollaborator RepositoryCollaborator[]
   request                Request?
@@ -38,14 +55,15 @@ model Repository {
 }
 
 model Resources {
-  id               String         @id @default(uuid())
+  id               String          @id @default(uuid())
   name             String
   region           String
-  resourceConfigId String         @unique
+  resourceConfigId String          @unique
   cloudProvider    CloudProvider
+  clusterRequest   ClusterRequest?
   repository       Repository?
   request          Request?
-  resourceConfig   ResourceConfig @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+  resourceConfig   ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
 }
 
 model ResourceConfig {
@@ -88,19 +106,20 @@ model AzureStorageInstance {
 }
 
 model AzureK8sCluster {
-  id               String          @id @default(uuid())
-  clusterName      String
-  nodeCount        Int             @default(3)
-  nodeSize         String          @default("Standard_D2s_v3")
-  kubeConfig       String?
-  clusterFqdn      String?
-  terraformState   Json?
-  resourceConfigId String
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  resourceConfig   ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
-  deployments      K8sDeployment[]
-  services         K8sService[]
+  id                String            @id @default(uuid())
+  clusterName       String
+  nodeCount         Int               @default(3)
+  nodeSize          String            @default("Standard_D2s_v3")
+  kubeConfig        String?
+  clusterFqdn       String?
+  terraformState    Json?
+  resourceConfigId  String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  resourceConfig    ResourceConfig    @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+  deployments       K8sDeployment[]
+  services          K8sService[]
+  ownedRepositories ownedRepository[]
 
   @@index([resourceConfigId])
 }
@@ -130,9 +149,10 @@ model User {
   email                  String                   @unique
   role                   Role
   gitlabUrl              String?
-  gitlabName             String?
   gitlabId               Int?
+  gitlabName             String?
   CloudResourceSecret    CloudResourceSecret[]
+  clusterRequests        ClusterRequest[]
   RepositoryCollaborator RepositoryCollaborator[]
   request                Request[]
   UserRepository         ownedRepository[]
@@ -188,19 +208,20 @@ model AwsStorageInstance {
 }
 
 model AwsK8sCluster {
-  id               String          @id @default(uuid())
-  clusterName      String
-  nodeCount        Int             @default(3)
-  nodeSize         String          @default("t3.medium")
-  kubeConfig       String?
-  clusterEndpoint  String?
-  terraformState   Json?
-  resourceConfigId String
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  resourceConfig   ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
-  deployments      K8sDeployment[]
-  services         K8sService[]
+  id                String            @id @default(uuid())
+  clusterName       String
+  nodeCount         Int               @default(3)
+  nodeSize          String            @default("t3.medium")
+  kubeConfig        String?
+  clusterEndpoint   String?
+  terraformState    Json?
+  resourceConfigId  String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  resourceConfig    ResourceConfig    @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
+  deployments       K8sDeployment[]
+  services          K8sService[]
+  ownedRepositories ownedRepository[]
 
   @@index([resourceConfigId])
 }
@@ -263,17 +284,21 @@ model K8sService {
 model ownedRepository {
   userId       String
   repositoryId String
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aksClusterId String?
+  eksClusterId String?
+  aksCluster   AzureK8sCluster? @relation(fields: [aksClusterId], references: [id], onDelete: Cascade)
+  eksCluster   AwsK8sCluster?   @relation(fields: [eksClusterId], references: [id], onDelete: Cascade)
+  repository   Repository       @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, repositoryId])
 }
 
 model RepositoryCollaborator {
   userId       String
-  gitlabUserId Int        @default(0)
-  repositoryId String  
+  repositoryId String
   assignedAt   DateTime   @default(now())
+  gitlabUserId Int        @default(0)
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 

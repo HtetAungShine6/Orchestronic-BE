@@ -31,6 +31,8 @@ import { AzurePolicyController } from './azure-policy/azure-policy.controller';
 import { AzurePolicyService } from './azure-policy/azure-policy.service';
 import { AwsPolicyModule } from './aws-policy/aws-policy.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
+import { ProjectRequestModule } from './request/project/project-request.module';
+import { ProjectRequestController } from './request/project/project-request.controller';
 
 @Module({
   imports: [
@@ -97,6 +99,7 @@ import { InfrastructureModule } from './infrastructure/infrastructure.module';
     CloudProvidersModule,
     AwsPolicyModule,
     InfrastructureModule,
+    ProjectRequestModule,
   ],
   controllers: [
     AppController,
