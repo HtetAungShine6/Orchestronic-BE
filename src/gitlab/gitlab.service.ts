@@ -213,4 +213,21 @@ export class GitlabService {
 
     return response.json();
   }
+
+  async getImageFromRegistry(projectId: number) {
+    const response = await fetch(`${this.gitlabUrl}/projects/${projectId}/registry/repositories`, {
+      method: 'GET',
+      headers: {
+        'PRIVATE-TOKEN': this.token!,
+        "Content-Type": 'application/json',
+      }
+    })
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab API error: ${error}`)
+    }
+
+    return response.json();
+  }
 }
