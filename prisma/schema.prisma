@@ -24,34 +24,38 @@ model Request {
   resources    Resources  @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
 }
 
-model ClusterRequest {
-  id           String      @id @default(uuid())
-  status       Status      @default(Pending)
-  description  String
-  resourcesId  String?     @unique
-  repositoryId String?     @unique
-  ownerId      String
-  createdAt    DateTime    @default(now())
-  displayCode  String      @unique
-  updatedAt    DateTime    @updatedAt
-  feedback     String?
-  owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  repository   Repository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  resources    Resources?  @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
+model ProjectRequest {
+  id                 String            @id @default(uuid())
+  status             Status            @default(Pending)
+  description        String
+  repositoryId       String            @unique
+  resourcesId        String?           @unique
+  ownerId            String
+  createdAt          DateTime          @default(now())
+  displayCode        String            @unique
+  updatedAt          DateTime          @updatedAt
+  feedback           String?
+  owner              User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  repository         Repository?       @relation("RepositoryProjectRequest", fields: [repositoryId], references: [id])
+  resources          Resources?        @relation("ProjectRequestResources", fields: [resourcesId], references: [id], onDelete: Cascade)
 }
 
 model Repository {
   id                     String                   @id @default(cuid())
   name                   String                   @unique
   description            String?
-  resourcesId            String                   @unique
+  resourcesId            String?                  @unique
+  azureK8sClusterId      String?                  @unique
+  awsK8sClusterId        String?                  @unique
   status                 RepositoryStatus         @default(Pending)
-  clusterRequests        ClusterRequest?
-  resources              Resources                @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
+  projectRequest         ProjectRequest?          @relation("RepositoryProjectRequest")
+  resources              Resources?               @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
   RepositoryCollaborator RepositoryCollaborator[]
   request                Request?
   UserRepository         ownedRepository[]
   collaborators          User[]                   @relation("RepositoryCollaborators")
+  azureK8sCluster        AzureK8sCluster?         @relation("AzureClusterRepositories", fields: [azureK8sClusterId], references: [id], onDelete: Cascade)
+  awsK8sCluster          AwsK8sCluster?           @relation("AwsClusterRepositories", fields: [awsK8sClusterId], references: [id], onDelete: Cascade)
 }
 
 model Resources {
@@ -60,7 +64,7 @@ model Resources {
   region           String
   resourceConfigId String          @unique
   cloudProvider    CloudProvider
-  clusterRequest   ClusterRequest?
+  projectRequest   ProjectRequest? @relation("ProjectRequestResources")
   repository       Repository?
   request          Request?
   resourceConfig   ResourceConfig  @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
@@ -119,8 +123,7 @@ model AzureK8sCluster {
   resourceConfig    ResourceConfig    @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
   deployments       K8sDeployment[]
   services          K8sService[]
-  ownedRepositories ownedRepository[]
-
+  repositories      Repository[]      @relation("AzureClusterRepositories")
   @@index([resourceConfigId])
 }
 
@@ -152,7 +155,7 @@ model User {
   gitlabId               Int?
   gitlabName             String?
   CloudResourceSecret    CloudResourceSecret[]
-  clusterRequests        ClusterRequest[]
+  clusterRequests        ProjectRequest[]
   RepositoryCollaborator RepositoryCollaborator[]
   request                Request[]
   UserRepository         ownedRepository[]
@@ -221,8 +224,7 @@ model AwsK8sCluster {
   resourceConfig    ResourceConfig    @relation(fields: [resourceConfigId], references: [id], onDelete: Cascade)
   deployments       K8sDeployment[]
   services          K8sService[]
-  ownedRepositories ownedRepository[]
-
+  repositories      Repository[]      @relation("AwsClusterRepositories")
   @@index([resourceConfigId])
 }
 
@@ -284,10 +286,6 @@ model K8sService {
 model ownedRepository {
   userId       String
   repositoryId String
-  aksClusterId String?
-  eksClusterId String?
-  aksCluster   AzureK8sCluster? @relation(fields: [aksClusterId], references: [id], onDelete: Cascade)
-  eksCluster   AwsK8sCluster?   @relation(fields: [eksClusterId], references: [id], onDelete: Cascade)
   repository   Repository       @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 

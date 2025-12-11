@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CreateClusterResourceAzureConfigDto } from 'src/request/project/dto/create-cluster-resource-azure-config.dto';
+import { CreateClusterResourceAzureConfigDto } from '../../../request/project/dto/request/create-cluster-resource-azure-config.dto';
 export class CreateAzureClusterResourceDto {
   @ApiProperty({
     example: 'rg-repository-name',

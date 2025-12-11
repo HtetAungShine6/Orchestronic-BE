@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsOptional, IsString } from "class-validator";
 import { CreateAzureClusterResourceDto } from "src/resource/cluster-resource/dto/create-azure-cluster-resource.dto";
-export class CreateAzureClusterRequestDto {
+export class CreateAzureClusterDto {
     @IsString()
     @ApiProperty({ example: 'uuid-of-cluster-request' })
     clusterRequestId: string;
