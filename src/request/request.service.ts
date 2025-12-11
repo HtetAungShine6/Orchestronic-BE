@@ -142,9 +142,6 @@ export class RequestService {
         AzureStorage: {
           create: resources.resourceConfig.sts || [],
         },
-        AzureK8sCluster: {
-          create: resources.resourceConfig.aks || [],
-        },
       },
     });
 
