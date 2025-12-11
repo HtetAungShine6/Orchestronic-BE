@@ -91,6 +91,11 @@ export class GitlabController {
     return this.gitlabService.rejectUser(Number(id));
   }
 
+  @Get('/registry/:projectId/image')
+  getImageFromRegistry(@Param('projectId') projectId: string) {
+    return this.gitlabService.getImageFromRegistry(Number(projectId));
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.gitlabService.remove(+id);
