@@ -154,8 +154,12 @@ export class ProjectRequestController {
       if(!response) {
         throw new Error('No response from adding repository to Azure cluster');
       }
-
-      return response;
+      
+      const result: AddRepositoryToClusterResponseAzureDto = {
+        statuscode: 200,
+        message: "Repository added to Azure cluster successfully",
+      };
+      return result;
     } catch(error) {
       throw new Error('Failed to add repository to Azure cluster');
     }
