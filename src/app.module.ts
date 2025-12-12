@@ -33,6 +33,8 @@ import { AwsPolicyModule } from './aws-policy/aws-policy.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { ProjectRequestModule } from './request/project/project-request.module';
 import { ProjectRequestController } from './request/project/project-request.controller';
+import { K8sAutomationModule } from './k8sautomation/k8sautomation.module';
+import { K8sAutomationService } from './k8sautomation/k8sautomation.service';
 
 @Module({
   imports: [
@@ -100,6 +102,7 @@ import { ProjectRequestController } from './request/project/project-request.cont
     AwsPolicyModule,
     InfrastructureModule,
     ProjectRequestModule,
+    K8sAutomationModule,
   ],
   controllers: [
     AppController,
@@ -116,6 +119,7 @@ import { ProjectRequestController } from './request/project/project-request.cont
     AirflowService,
     RabbitmqService,
     AzurePolicyService,
+    K8sAutomationService,
   ],
 })
 export class AppModule {}

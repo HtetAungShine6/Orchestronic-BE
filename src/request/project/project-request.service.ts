@@ -11,6 +11,8 @@ import { CreateProjectRequestDto } from "./dto/request/create-project-request.dt
 import { AddRepositoryToAzureClusterDto } from "./dto/request/update-repository-azure.dto";
 import { AzureK8sClusterDto } from "./dto/response/cluster-response-azure.dto";
 import { ProjectRequestDto } from "./dto/response/project-request.dto";
+import { K8sAutomationService } from "src/k8sautomation/k8sautomation.service";
+import { CreateClusterDeploymentRequestDto } from "src/k8sautomation/dto/request/create-deploy-request.dto";
 
 @Injectable()
 export class ProjectRequestService {
@@ -19,6 +21,7 @@ export class ProjectRequestService {
     private readonly rabbitmqService: RabbitmqService,
     private readonly airflowService: AirflowService,
     private readonly gitlabService: GitlabService,
+    private readonly k8sAutomationService: K8sAutomationService,
   ) {}
 
   async createProjectRequest(
@@ -318,12 +321,35 @@ export class ProjectRequestService {
       throw new BadRequestException('Repository not found');
     }
 
+    const gitlabProject = await this.gitlabService.getProjectByName(
+      repository.name,
+    );
+
+    if (!gitlabProject) {
+      throw new BadRequestException('Gitlab project not found');
+    }
+
     const cluster = await this.databaseService.azureK8sCluster.findUnique({
       where: { id: request.clusterId },
     });
 
     if (!cluster) {
       throw new BadRequestException('Azure K8s Cluster not found');
+    }
+
+    // TODO: add kubeconfig to k8s automation service by cluster id
+
+    // create create deployment request dto object
+    const deploymentRequest = new CreateClusterDeploymentRequestDto({
+      name: repository.name,
+      image: gitlabProject,
+      port: request.port,
+      usePrivateRegistry: request.usePrivateRegistry, 
+    });
+
+    const deployment = await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
+    if (!deployment) {
+      throw new BadRequestException('Failed to create deployment in K8s cluster');
     }
 
     // add repository to cluster

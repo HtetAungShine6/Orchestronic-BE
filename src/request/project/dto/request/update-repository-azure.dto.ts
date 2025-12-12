@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsString } from "class-validator";
+import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class AddRepositoryToAzureClusterDto {
     @IsString()
@@ -12,4 +12,17 @@ export class AddRepositoryToAzureClusterDto {
         example: "uuid-of-repository",
     })
     repositoryId: string;
+    @ApiProperty({
+        example: 3000,
+    })
+    port: number;
+
+    @IsOptional()
+    @IsBoolean()
+    @ApiProperty({
+        description: "Indicates whether the image is hosted on a private registry",
+        example: false,
+        required: false,
+    })
+    usePrivateRegistry?: boolean;
 }
