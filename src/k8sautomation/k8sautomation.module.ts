@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { HttpModule } from "@nestjs/axios";
 import { K8sAutomationService } from "./k8sautomation.service";
 
 @Module({

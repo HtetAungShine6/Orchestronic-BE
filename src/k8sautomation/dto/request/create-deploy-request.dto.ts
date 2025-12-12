@@ -1,26 +1,27 @@
-import { ApiBody } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 import { IsOptional } from "class-validator";
 
 export class CreateClusterDeploymentRequestDto {
-    @ApiBody({
+    @ApiProperty({
         example: 'image-name',
     })
     name: string;
     
-    @ApiBody({
+    @ApiProperty({
         example: 'repository/image:tag',
     })
     image: string;
 
-    @ApiBody({
+    @ApiProperty({
         example: 8080,
     })
     port: number;
 
     @IsOptional()
-    @ApiBody({
+    @ApiProperty({
         description: 'Indicates whether image is on a private registry',
         example: false,
+        required: false,
     })
     usePrivateRegistry?: boolean;
 }

@@ -6,13 +6,14 @@ import { BackendJwtPayload } from "src/lib/types";
 import { RabbitmqService } from "src/rabbitmq/rabbitmq.service";
 import { CreateAzureClusterDto } from "./dto/request/create-cluster-azure.dto";
 import { ApiBody } from "@nestjs/swagger";
-import { CloudProvider } from "@prisma/client";
+import { CloudProvider, deployStatus, Status } from "@prisma/client";
 import { CreateProjectRequestDto } from "./dto/request/create-project-request.dto";
 import { AddRepositoryToAzureClusterDto } from "./dto/request/update-repository-azure.dto";
 import { AzureK8sClusterDto } from "./dto/response/cluster-response-azure.dto";
 import { ProjectRequestDto } from "./dto/response/project-request.dto";
 import { K8sAutomationService } from "src/k8sautomation/k8sautomation.service";
 import { CreateClusterDeploymentRequestDto } from "src/k8sautomation/dto/request/create-deploy-request.dto";
+import { UserClustersPayloadDto } from "./dto/response/get-cluster-by-user-id-response.dto";
 
 @Injectable()
 export class ProjectRequestService {
@@ -24,105 +25,105 @@ export class ProjectRequestService {
     private readonly k8sAutomationService: K8sAutomationService,
   ) {}
 
-  async createProjectRequest(
-    user: BackendJwtPayload,
-    request: CreateProjectRequestDto
-  ) {
+  // async createProjectRequest(
+  //   user: BackendJwtPayload,
+  //   request: CreateProjectRequestDto
+  // ) {
 
-    try {
-      const ownerId = user.id;
-      const ownerInDb = await this.databaseService.user.findUnique({
-        where: { id: ownerId },
-        select: { id: true },
-      });
-      const { repository } = request;
-      if (!ownerInDb) {
-        throw new BadRequestException('Authenticated user not found in database');
-      }
+  //   try {
+  //     const ownerId = user.id;
+  //     const ownerInDb = await this.databaseService.user.findUnique({
+  //       where: { id: ownerId },
+  //       select: { id: true },
+  //     });
+  //     const { repository } = request;
+  //     if (!ownerInDb) {
+  //       throw new BadRequestException('Authenticated user not found in database');
+  //     }
 
-      const existingRepo = await this.databaseService.repository.findUnique({
-        where: { name: repository.name },
-      });
+  //     const existingRepo = await this.databaseService.repository.findUnique({
+  //       where: { name: repository.name },
+  //     });
 
-      if (existingRepo)
-        throw new ConflictException('Repository name already exists');
+  //     if (existingRepo)
+  //       throw new ConflictException('Repository name already exists');
 
-      const newRepository = await this.databaseService.repository.create({
-        data: {
-          name: repository.name,
-          description: repository.description,
-          RepositoryCollaborator: {
-            create:
-              repository.collaborators?.map((c) => ({
-                userId: c.userId,
-                gitlabUserId: c.gitlabUserId,
-              })) || [],
-          },
-        },
-      });
+  //     const newRepository = await this.databaseService.repository.create({
+  //       data: {
+  //         name: repository.name,
+  //         description: repository.description,
+  //         RepositoryCollaborator: {
+  //           create:
+  //             repository.collaborators?.map((c) => ({
+  //               userId: c.userId,
+  //               gitlabUserId: c.gitlabUserId,
+  //             })) || [],
+  //         },
+  //       },
+  //     });
 
-      if(!newRepository) {
-        throw new BadRequestException('Failed to create repository');
-      }
+  //     if(!newRepository) {
+  //       throw new BadRequestException('Failed to create repository');
+  //     }
 
-      const gitlabOwner = await this.databaseService.user.findUniqueOrThrow({
-        where: { id: ownerId },
-        select: { gitlabName: true },
-      });
+  //     const gitlabOwner = await this.databaseService.user.findUniqueOrThrow({
+  //       where: { id: ownerId },
+  //       select: { gitlabName: true },
+  //     });
 
-      await this.gitlabService.createProjectForAUser(
-        gitlabOwner.gitlabName ?? '',
-        {
-          name: repository.name,
-          description: repository.description ?? '',
-        },
-      );
+  //     await this.gitlabService.createProjectForAUser(
+  //       gitlabOwner.gitlabName ?? '',
+  //       {
+  //         name: repository.name,
+  //         description: repository.description ?? '',
+  //       },
+  //     );
 
-      const lastRequest = await this.databaseService.projectRequest.findFirst({
-        orderBy: { createdAt: 'desc' },
-        select: { displayCode: true },
-      });
-      const lastNumber = lastRequest
-        ? parseInt(lastRequest.displayCode.split('-')[1])
-        : 0;
-      const displayCode = `P-${lastNumber + 1}`;
+  //     const lastRequest = await this.databaseService.request.findFirst({
+  //       orderBy: { createdAt: 'desc' },
+  //       select: { displayCode: true },
+  //     });
+  //     const lastNumber = lastRequest
+  //       ? parseInt(lastRequest.displayCode.split('-')[1])
+  //       : 0;
+  //     const displayCode = `P-${lastNumber + 1}`;
 
-      const projectRequest = await this.databaseService.projectRequest.create({
-        data: {
-          description: request.description,
-          displayCode,
-          owner: { connect: { id: ownerId } },
-          repository: { connect: { id: newRepository.id } },
-        },
-        include: {
-          repository: true,
-          owner: true,
-        },
-      })
+  //     const projectRequest = await this.databaseService.request.create({
+  //       data: {
+  //         description: request.description,
+  //         displayCode,
+  //         owner: { connect: { id: ownerId } },
+  //         repository: { connect: { id: newRepository.id } },
+  //       },
+  //       include: {
+  //         repository: true,
+  //         owner: true,
+  //       },
+  //     })
 
-      if(!projectRequest) {
-        throw new BadRequestException('Failed to create project request');
-      }
+  //     if(!projectRequest) {
+  //       throw new BadRequestException('Failed to create project request');
+  //     }
 
-      // map projectRequest to ProjectRequestDto
-      const response: ProjectRequestDto = {
-        id: projectRequest.id,
-        displayCode: projectRequest.displayCode,
-        description: projectRequest.description,
-        status: projectRequest.status,
-        repositoryId: projectRequest.repositoryId,
-        azureK8sClusterId: projectRequest.repository?.azureK8sClusterId ?? undefined,
-        awsK8sClusterId: projectRequest.repository?.awsK8sClusterId ?? undefined,
-        ownerId: projectRequest.ownerId,
-        resourceId: projectRequest.resourcesId ?? undefined,
-        feedback: projectRequest.feedback ?? '',
-      };
+  //     // map projectRequest to ProjectRequestDto
+  //     const response: ProjectRequestDto = {
+  //       id: projectRequest.id,
+  //       displayCode: projectRequest.displayCode,
+  //       description: projectRequest.description,
+  //       status: projectRequest.status,
+  //       repositoryId: projectRequest.repositoryId,
+  //       azureK8sClusterId: projectRequest.repository?.azureK8sClusterId ?? undefined,
+  //       awsK8sClusterId: projectRequest.repository?.awsK8sClusterId ?? undefined,
+  //       ownerId: projectRequest.ownerId,
+  //       resourceId: projectRequest.resourcesId ?? undefined,
+  //       feedback: projectRequest.feedback ?? '',
+  //     };
 
-      return response;
-    } catch(error) {
-      throw new Error('Failed to create project request');
-    }
-  }
+  //     return response;
+  //   } catch(error) {
+  //     throw new Error('Failed to create project request');
+  //   }
+  // }
 
   @ApiBody({ type: CreateAzureClusterDto })
   async createCluster(
@@ -158,8 +159,8 @@ export class ProjectRequestService {
       },
     });
 
-    const updatedClusterRequest = await this.databaseService.projectRequest.update({
-      where: { id: request.clusterRequestId },
+    const updatedClusterRequest = await this.databaseService.request.update({
+      where: { id: request.requestId },
       data: {
         resources: { connect: { id: newResource.id } },
       },
@@ -174,76 +175,33 @@ export class ProjectRequestService {
     }
     await Promise.all([
       this.rabbitmqService.queueRequest(updatedClusterRequest.id),
-      this.airflowService.triggerDag(user, 'AZURE_K8s_Resource_Group'),
+      this.airflowService.triggerDag(user, 'AZURE_Resource_Group'),
     ]);
 
     return updatedClusterRequest;
   }
 
 
-  async findClusterByUserId(userId: string, provider: CloudProvider) {
+  async findClusterByUserId(userId: string) {
     
-    if (provider === CloudProvider.AWS) {
-      return this.databaseService.projectRequest.findMany({
-        where: { ownerId: userId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          resources: {
-            include: {
-              resourceConfig: {
-                include: {
-                  AwsK8sCluster: true,
-                },
-              },
-            },
-          },
-          repository: true,
-        },
-      });
+    const awsClusters = await this.databaseService.awsK8sCluster.findMany({
+      where: { resourceConfig: { resources: { request: { ownerId: userId } } } },
+      include: { resourceConfig: { include: { resources: true } } },
+    });
+
+    const azureClusters = await this.databaseService.azureK8sCluster.findMany({
+      where: { resourceConfig: { resources: { request: { ownerId: userId } } } },
+      include: { resourceConfig: { include: { resources: true } } },
+    });
+
+    if ((!awsClusters || awsClusters.length === 0) && (!azureClusters || azureClusters.length === 0)) {
+      throw new BadRequestException('No clusters found for user');
     }
 
-    if (provider === CloudProvider.AZURE) {
-      const response = await this.databaseService.projectRequest.findMany({
-        where: { ownerId: userId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          resources: {
-            include: {
-              resourceConfig: {
-                include: {
-                  AzureK8sCluster: true,
-                },
-              },
-            },
-          },
-          repository: true,
-        },
-      });
-
-      if (!response || response.length === 0) {
-        throw new BadRequestException('No Azure clusters found for user');
-      }
-
-      const clusters: AzureK8sClusterDto[] = response.flatMap((req) => {
-        const azureClusters = req.resources?.resourceConfig?.AzureK8sCluster ?? [];
-        return azureClusters.map((cluster) => ({
-          id: cluster.id,
-          clusterName: cluster.clusterName,
-          nodeCount: cluster.nodeCount,
-          nodeSize: cluster.nodeSize,
-          resourceConfigId: cluster.resourceConfigId,
-          ...(cluster.kubeConfig ? { kubeConfig: cluster.kubeConfig } : {}),
-          ...(cluster.clusterFqdn ? { clusterFqdn: cluster.clusterFqdn } : {}),
-          ...(cluster.terraformState
-            ? { terraformState: JSON.stringify(cluster.terraformState) }
-            : {}),
-        }));
-      });
-
-      return clusters;
-    }
-
-    return null;
+    return {
+      awsClusters,
+      azureClusters,
+    } as UserClustersPayloadDto;
   }
 
   async findClusterById(clusterId: string, provider: CloudProvider) {
@@ -257,13 +215,7 @@ export class ProjectRequestService {
           kubeConfig: true,
           clusterEndpoint: true,
           terraformState: true,
-          repositories: {
-            include: {
-              UserRepository: {
-                include: { user: true },
-              },
-            },
-          },
+          resourceConfigId: true,
         }
       });
     }
@@ -279,13 +231,6 @@ export class ProjectRequestService {
           clusterFqdn: true,
           terraformState: true,
           resourceConfigId: true,
-          repositories: {
-            include: {
-              UserRepository: {
-                include: { user: true },
-              },
-            },
-          },
         }
       });
 
@@ -311,8 +256,8 @@ export class ProjectRequestService {
   }
 
 
-  async addRepositoryToAzureCluster(request: AddRepositoryToAzureClusterDto) {
-    // get repository
+  async DeployToAzureCluster(request: AddRepositoryToAzureClusterDto) {
+    // Check if repository exists
     const repository = await this.databaseService.repository.findUnique({
       where: { id: request.repositoryId },
     });
@@ -321,14 +266,18 @@ export class ProjectRequestService {
       throw new BadRequestException('Repository not found');
     }
 
-    const gitlabProject = await this.gitlabService.getProjectByName(
-      repository.name,
-    );
-
-    if (!gitlabProject) {
-      throw new BadRequestException('Gitlab project not found');
+    // Get image from gitlab
+    const projectId = await this.gitlabService.getProjectByName(repository.name);
+    if (!projectId) {
+      throw new BadRequestException('Project not found in GitLab');
     }
 
+    const projectImage = await this.gitlabService.getImageFromRegistry(projectId)
+    if (!projectImage) {
+      throw new BadRequestException('No image found in GitLab registry');
+    }
+
+    // Get chosen cluster
     const cluster = await this.databaseService.azureK8sCluster.findUnique({
       where: { id: request.clusterId },
     });
@@ -339,24 +288,47 @@ export class ProjectRequestService {
 
     // TODO: add kubeconfig to k8s automation service by cluster id
 
-    // create create deployment request dto object
-    const deploymentRequest = new CreateClusterDeploymentRequestDto({
-      name: repository.name,
-      image: gitlabProject,
-      port: request.port,
-      usePrivateRegistry: request.usePrivateRegistry, 
-    });
+    // Deploy into cluster
+    const deploymentRequest = new CreateClusterDeploymentRequestDto();
+    deploymentRequest.name = projectImage.name;
+    deploymentRequest.image = projectImage.location;
+    deploymentRequest.port = request.port;
+    deploymentRequest.usePrivateRegistry = request.usePrivateRegistry ?? undefined;
 
-    const deployment = await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
-    if (!deployment) {
-      throw new BadRequestException('Failed to create deployment in K8s cluster');
+    const deploymentResponse =await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
+    if (!deploymentResponse || !deploymentResponse.success) {
+      throw new BadRequestException('Failed to deploy to Azure K8s Cluster');
     }
 
-    // add repository to cluster
+    // Add resource to repository
+    const resourceConfig = await this.databaseService.resourceConfig.findUnique({
+      where: { id: cluster.resourceConfigId },
+    });
+    if (!resourceConfig) {
+      throw new BadRequestException('Resource config not found');
+    }
+
+    const resource = await this.databaseService.resources.findFirst({
+      where: { resourceConfigId: resourceConfig.id },
+    });
+    if (!resource) {
+      throw new BadRequestException('Resource not found');
+    }
+
+    // Add repository to cluster
     const response = await this.databaseService.repository.update({
       where: { id: request.repositoryId },
       data: {
-        azureK8sClusterId: request.clusterId,
+        resourcesId: resource.id,
+      },
+    });
+
+    await this.databaseService.imageDeployment.create({
+      data: {
+        repositoryId: request.repositoryId,
+        AzureK8sClusterId: cluster.id,
+        imageUrl: projectImage.location, // Add the appropriate image URL
+        DeploymentStatus: deployStatus.Deployed,
       },
     });
     

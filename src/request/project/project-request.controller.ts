@@ -12,6 +12,7 @@ import { GetClusterByIdResponseDto } from "./dto/response/get-cluster-by-id-resp
 import { GetClusterByUserIdResponseDto } from "./dto/response/get-cluster-by-user-id-response.dto";
 import { CreateProjectResponseDto } from "./dto/response/create-project-response.dto";
 import { AzureK8sClusterDto } from "./dto/response/cluster-response-azure.dto";
+import { AddRepositoryToClusterResponseAzureDto } from "./dto/response/add-repository-to-cluster-response-azure.dto";
 
 @Controller('project')
 export class ProjectRequestController {
@@ -20,41 +21,41 @@ export class ProjectRequestController {
     private readonly gitlabService: GitlabService,
   ) {}
 
-  @Post()
-  @ApiOperation({
-    summary: 'Create a new project request',
-  })
-  @ApiBody({ type: CreateProjectRequestDto })
-  async createProjectRequest(
-    @Request() req: RequestWithCookies,
-    @Body() request: CreateProjectRequestDto,
-  ) {
-    const token = req.cookies?.['access_token'];
-    if (token === undefined) {
-      throw new UnauthorizedException('No access token');
-    }
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET not defined');
-    }
+  // @Post()
+  // @ApiOperation({
+  //   summary: 'Create a new project request',
+  // })
+  // @ApiBody({ type: CreateProjectRequestDto })
+  // async createProjectRequest(
+  //   @Request() req: RequestWithCookies,
+  //   @Body() request: CreateProjectRequestDto,
+  // ) {
+  //   const token = req.cookies?.['access_token'];
+  //   if (token === undefined) {
+  //     throw new UnauthorizedException('No access token');
+  //   }
+  //   const secret = process.env.JWT_SECRET;
+  //   if (!secret) {
+  //     throw new Error('JWT_SECRET not defined');
+  //   }
 
-    try {
-      const decoded = jwt.verify(token, secret) as unknown;
-      const payload = decoded as BackendJwtPayload;
-      const response = await this.clusterRequestService.createProjectRequest(payload, request);
+  //   try {
+  //     const decoded = jwt.verify(token, secret) as unknown;
+  //     const payload = decoded as BackendJwtPayload;
+  //     const response = await this.clusterRequestService.createProjectRequest(payload, request);
 
-      if(!response) return new Error('Failed to create project request');
-      const project: CreateProjectResponseDto = {
-        statuscode: 201,
-        message: response,
-      };
-      return project;
+  //     if(!response) return new Error('Failed to create project request');
+  //     const project: CreateProjectResponseDto = {
+  //       statuscode: 201,
+  //       message: response,
+  //     };
+  //     return project;
 
-    } catch {
-      console.error('Request Controller: Error decoding token');
-      throw new Error('Invalid token - unable to process');
-    }
-  }
+  //   } catch {
+  //     console.error('Request Controller: Error decoding token');
+  //     throw new Error('Invalid token - unable to process');
+  //   }
+  // }
 
   @Post('/azure')
   @ApiOperation({
@@ -113,15 +114,14 @@ export class ProjectRequestController {
     try {
       const response = (await this.clusterRequestService.findClusterByUserId(
         userid,
-        CloudProvider.AZURE,
-      )) as AzureK8sClusterDto[];
+      ));
       if(!response) {
         throw new Error('Azure cluster not found');
       }
       
       const cluster: GetClusterByUserIdResponseDto = {
         statuscode: 200,
-        message: response,
+        data: response,
       };
       return cluster;
     } catch (error) {
@@ -129,12 +129,12 @@ export class ProjectRequestController {
     }
   }
 
-  @Patch('repository/azure')
+  @Patch('deploy/azure')
   @ApiOperation({
-    summary: 'Add repository to Azure cluster',
+    summary: 'Deploy image to Azure cluster',
   })
   @ApiBody({ type: AddRepositoryToAzureClusterDto })
-  async addRepositoryToAzureCluster(
+  async deployToAzureCluster(
     @Request() req: RequestWithCookies,
     @Body() request: AddRepositoryToAzureClusterDto,
   ) {
@@ -149,19 +149,19 @@ export class ProjectRequestController {
     }
 
     try {
-      const response = await this.clusterRequestService.addRepositoryToAzureCluster(request);
+      const response = await this.clusterRequestService.DeployToAzureCluster(request);
 
       if(!response) {
-        throw new Error('No response from adding repository to Azure cluster');
+        throw new Error('No response from deploying to Azure cluster');
       }
       
       const result: AddRepositoryToClusterResponseAzureDto = {
         statuscode: 200,
-        message: "Repository added to Azure cluster successfully",
+        message: "Deployed to Azure cluster successfully",
       };
       return result;
     } catch(error) {
-      throw new Error('Failed to add repository to Azure cluster');
+      throw new Error('Failed to deploy to Azure cluster');
     }
     
   }

@@ -1,4 +1,4 @@
 export class CreateClusterDeploymentResponseDto {
-    statuscode: number;
-    message: 
+    success: boolean;
+    message: string;
 }

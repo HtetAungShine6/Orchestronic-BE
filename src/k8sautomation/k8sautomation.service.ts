@@ -7,12 +7,13 @@ import {
 } from '@nestjs/common';
 import { CreateClusterDeploymentRequestDto } from "./dto/request/create-deploy-request.dto";
 import { firstValueFrom } from 'rxjs';
+import { CreateClusterDeploymentResponseDto } from "./dto/response/create-deploy-response.dto";
 
 @Injectable()
 export class K8sAutomationService {
     constructor(private readonly httpService: HttpService) {}
 
-    async automateK8sDeployment(request: CreateClusterDeploymentRequestDto): Promise<void> {
+    async automateK8sDeployment(request: CreateClusterDeploymentRequestDto): Promise<CreateClusterDeploymentResponseDto> {
         const k8s_base_url = process.env.K8S_AUTOMATION_BASE_API_URL || 'http://localhost:4003/_api/k8s-automation';
         const subpath = '/_api/k8s-automation';
         const path = 'initialize';
@@ -27,7 +28,7 @@ export class K8sAutomationService {
             );
             const resp = await firstValueFrom(response$);
 
-            return resp.data;
+            return resp.data as CreateClusterDeploymentResponseDto;
         } catch (err: any) {
             throw new HttpException(
                 {

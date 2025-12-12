@@ -12,7 +12,7 @@ model Request {
   id           String     @id @default(uuid())
   status       Status     @default(Pending)
   description  String
-  resourcesId  String     @unique
+  resourcesId  String?    @unique
   repositoryId String     @unique
   ownerId      String
   createdAt    DateTime   @default(now())
@@ -21,7 +21,7 @@ model Request {
   feedback     String?
   owner        User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  resources    Resources  @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
+  resources    Resources? @relation(fields: [resourcesId], references: [id], onDelete: Cascade)
 }
 
 // model ProjectRequest {
@@ -401,6 +401,11 @@ enum Status {
   Approved
   Rejected
   Deleted
+}
+
+enum deployStatus {
+  Pending
+  Deployed
 }
 
 enum Role {
