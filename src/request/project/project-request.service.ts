@@ -1,19 +1,23 @@
-import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
-import { AirflowService } from "src/airflow/airflow.service";
-import { DatabaseService } from "src/database/database.service";
-import { GitlabService } from "src/gitlab/gitlab.service";
-import { BackendJwtPayload } from "src/lib/types";
-import { RabbitmqService } from "src/rabbitmq/rabbitmq.service";
-import { CreateAzureClusterDto } from "./dto/request/create-cluster-azure.dto";
-import { ApiBody } from "@nestjs/swagger";
-import { CloudProvider, deployStatus, Status } from "@prisma/client";
-import { CreateProjectRequestDto } from "./dto/request/create-project-request.dto";
-import { AddRepositoryToAzureClusterDto } from "./dto/request/update-repository-azure.dto";
-import { AzureK8sClusterDto } from "./dto/response/cluster-response-azure.dto";
-import { ProjectRequestDto } from "./dto/response/project-request.dto";
-import { K8sAutomationService } from "src/k8sautomation/k8sautomation.service";
-import { CreateClusterDeploymentRequestDto } from "src/k8sautomation/dto/request/create-deploy-request.dto";
-import { UserClustersPayloadDto } from "./dto/response/get-cluster-by-user-id-response.dto";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { AirflowService } from 'src/airflow/airflow.service';
+import { DatabaseService } from 'src/database/database.service';
+import { GitlabService } from 'src/gitlab/gitlab.service';
+import { BackendJwtPayload } from 'src/lib/types';
+import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
+import { CreateAzureClusterDto } from './dto/request/create-cluster-azure.dto';
+import { ApiBody } from '@nestjs/swagger';
+import { CloudProvider, deployStatus, Status } from '@prisma/client';
+import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
+import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
+import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
+import { ProjectRequestDto } from './dto/response/project-request.dto';
+import { K8sAutomationService } from 'src/k8sautomation/k8sautomation.service';
+import { CreateClusterDeploymentRequestDto } from 'src/k8sautomation/dto/request/create-deploy-request.dto';
+import { UserClustersPayloadDto } from './dto/response/get-cluster-by-user-id-response.dto';
 
 @Injectable()
 export class ProjectRequestService {
@@ -126,13 +130,12 @@ export class ProjectRequestService {
   // }
 
   @ApiBody({ type: CreateAzureClusterDto })
-  async createCluster(
-    user: BackendJwtPayload,
-    request: CreateAzureClusterDto
-  ) {
+  async createCluster(user: BackendJwtPayload, request: CreateAzureClusterDto) {
     const ownerId = user.id;
     const resources = request.resources;
-    const provider = (resources.cloudProvider || '').toUpperCase() as CloudProvider;
+    const provider = (
+      resources.cloudProvider || ''
+    ).toUpperCase() as CloudProvider;
     const ownerInDb = await this.databaseService.user.findUnique({
       where: { id: ownerId },
       select: { id: true },
@@ -169,9 +172,11 @@ export class ProjectRequestService {
         repository: true,
       },
     });
-    
-    if(!updatedClusterRequest) {
-      throw new BadRequestException('Failed to update cluster request with resources');
+
+    if (!updatedClusterRequest) {
+      throw new BadRequestException(
+        'Failed to update cluster request with resources',
+      );
     }
     await Promise.all([
       this.rabbitmqService.queueRequest(updatedClusterRequest.id),
@@ -181,20 +186,25 @@ export class ProjectRequestService {
     return updatedClusterRequest;
   }
 
-
   async findClusterByUserId(userId: string) {
-    
     const awsClusters = await this.databaseService.awsK8sCluster.findMany({
-      where: { resourceConfig: { resources: { request: { ownerId: userId } } } },
+      where: {
+        resourceConfig: { resources: { request: { ownerId: userId } } },
+      },
       include: { resourceConfig: { include: { resources: true } } },
     });
 
     const azureClusters = await this.databaseService.azureK8sCluster.findMany({
-      where: { resourceConfig: { resources: { request: { ownerId: userId } } } },
+      where: {
+        resourceConfig: { resources: { request: { ownerId: userId } } },
+      },
       include: { resourceConfig: { include: { resources: true } } },
     });
 
-    if ((!awsClusters || awsClusters.length === 0) && (!azureClusters || azureClusters.length === 0)) {
+    if (
+      (!awsClusters || awsClusters.length === 0) &&
+      (!azureClusters || azureClusters.length === 0)
+    ) {
       throw new BadRequestException('No clusters found for user');
     }
 
@@ -216,7 +226,7 @@ export class ProjectRequestService {
           clusterEndpoint: true,
           terraformState: true,
           resourceConfigId: true,
-        }
+        },
       });
     }
 
@@ -231,9 +241,8 @@ export class ProjectRequestService {
           clusterFqdn: true,
           terraformState: true,
           resourceConfigId: true,
-        }
+        },
       });
-
 
       if (!response) return null;
 
@@ -243,8 +252,12 @@ export class ProjectRequestService {
         nodeCount: response.nodeCount,
         nodeSize: response.nodeSize,
         resourceConfigId: response.resourceConfigId,
-        ...(response.kubeConfig ? { kubeConfig: JSON.stringify(response.kubeConfig) } : {}),
-        ...(response.clusterFqdn ? { clusterFqdn: JSON.stringify(response.clusterFqdn) } : {}),
+        ...(response.kubeConfig
+          ? { kubeConfig: JSON.stringify(response.kubeConfig) }
+          : {}),
+        ...(response.clusterFqdn
+          ? { clusterFqdn: JSON.stringify(response.clusterFqdn) }
+          : {}),
         ...(response.terraformState
           ? { terraformState: JSON.stringify(response.terraformState) }
           : {}),
@@ -254,7 +267,6 @@ export class ProjectRequestService {
     }
     return null;
   }
-
 
   async DeployToAzureCluster(request: AddRepositoryToAzureClusterDto) {
     // Check if repository exists
@@ -267,13 +279,16 @@ export class ProjectRequestService {
     }
 
     // Get image from gitlab
-    const projectId = await this.gitlabService.getProjectByName(repository.name);
+    const projectId = await this.gitlabService.getProjectByName(
+      repository.name,
+    );
     if (!projectId) {
       throw new BadRequestException('Project not found in GitLab');
     }
 
-    const projectImage = await this.gitlabService.getImageFromRegistry(projectId)
-    if (!projectImage) {
+    const projectDetail =
+      await this.gitlabService.getImageFromRegistry(projectId);
+    if (!projectDetail) {
       throw new BadRequestException('No image found in GitLab registry');
     }
 
@@ -290,20 +305,24 @@ export class ProjectRequestService {
 
     // Deploy into cluster
     const deploymentRequest = new CreateClusterDeploymentRequestDto();
-    deploymentRequest.name = projectImage.name;
-    deploymentRequest.image = projectImage.location;
+    deploymentRequest.name = projectDetail.name;
+    deploymentRequest.image = projectDetail.image;
     deploymentRequest.port = request.port;
-    deploymentRequest.usePrivateRegistry = request.usePrivateRegistry ?? undefined;
+    deploymentRequest.usePrivateRegistry =
+      request.usePrivateRegistry ?? undefined;
 
-    const deploymentResponse =await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
+    const deploymentResponse =
+      await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
     if (!deploymentResponse || !deploymentResponse.success) {
       throw new BadRequestException('Failed to deploy to Azure K8s Cluster');
     }
 
     // Add resource to repository
-    const resourceConfig = await this.databaseService.resourceConfig.findUnique({
-      where: { id: cluster.resourceConfigId },
-    });
+    const resourceConfig = await this.databaseService.resourceConfig.findUnique(
+      {
+        where: { id: cluster.resourceConfigId },
+      },
+    );
     if (!resourceConfig) {
       throw new BadRequestException('Resource config not found');
     }
@@ -327,12 +346,11 @@ export class ProjectRequestService {
       data: {
         repositoryId: request.repositoryId,
         AzureK8sClusterId: cluster.id,
-        imageUrl: projectImage.location, // Add the appropriate image URL
+        imageUrl: projectDetail.image, // Add the appropriate image URL
         DeploymentStatus: deployStatus.Deployed,
       },
     });
-    
+
     return response;
   }
-
 }

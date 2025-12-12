@@ -39,4 +39,28 @@ export class ResourceController {
   getVmPrice(@Query('vmSize') vmSize: string, @Query('region') region: string) {
     return this.resourceService.getVmPrice(vmSize, region);
   }
+
+  @Get('resource-groups')
+  @ApiOperation({
+    summary: 'Find resource groups for the authenticated user',
+  })
+  findResourceGroups(@Request() req: RequestWithCookies) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as unknown;
+      const payload = decoded as BackendJwtPayload;
+      return this.resourceService.findResourceGroups(payload);
+    } catch (err) {
+      console.error('Resource Controller: Error decoding token', err);
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
 }
