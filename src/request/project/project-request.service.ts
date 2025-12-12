@@ -286,9 +286,9 @@ export class ProjectRequestService {
       throw new BadRequestException('Project not found in GitLab');
     }
 
-    const projectImage =
+    const projectDetail =
       await this.gitlabService.getImageFromRegistry(projectId);
-    if (!projectImage) {
+    if (!projectDetail) {
       throw new BadRequestException('No image found in GitLab registry');
     }
 
@@ -305,8 +305,8 @@ export class ProjectRequestService {
 
     // Deploy into cluster
     const deploymentRequest = new CreateClusterDeploymentRequestDto();
-    deploymentRequest.name = projectImage.name;
-    deploymentRequest.image = projectImage.location;
+    deploymentRequest.name = projectDetail.name;
+    deploymentRequest.image = projectDetail.image;
     deploymentRequest.port = request.port;
     deploymentRequest.usePrivateRegistry =
       request.usePrivateRegistry ?? undefined;
@@ -346,7 +346,7 @@ export class ProjectRequestService {
       data: {
         repositoryId: request.repositoryId,
         AzureK8sClusterId: cluster.id,
-        imageUrl: projectImage.location, // Add the appropriate image URL
+        imageUrl: projectDetail.image, // Add the appropriate image URL
         DeploymentStatus: deployStatus.Deployed,
       },
     });

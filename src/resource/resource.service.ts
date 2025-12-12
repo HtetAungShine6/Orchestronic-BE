@@ -98,4 +98,14 @@ export class ResourceService {
       },
     });
   }
+
+  findResourceGroups(user: BackendJwtPayload) {
+    return this.databaseService.request.findMany({
+      where: { ownerId: user.id },
+      select: {
+        resources: true,
+      },
+      distinct: ['id'],
+    });
+  }
 }

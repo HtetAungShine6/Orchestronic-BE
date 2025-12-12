@@ -188,7 +188,7 @@ export class GitlabService {
     }
 
     const projects = await response.json();
-    return projects[0] ?? null; 
+    return projects[0] ?? null;
   }
 
   async inviteUserToProject(projectId: number, gitlabUserId: number) {
@@ -215,19 +215,28 @@ export class GitlabService {
   }
 
   async getImageFromRegistry(projectId: number) {
-    const response = await fetch(`${this.gitlabUrl}/projects/${projectId}/registry/repositories`, {
-      method: 'GET',
-      headers: {
-        'PRIVATE-TOKEN': this.token!,
-        "Content-Type": 'application/json',
-      }
-    })
+    const response = await fetch(
+      `${this.gitlabUrl}/projects/${projectId}/registry/repositories`,
+      {
+        method: 'GET',
+        headers: {
+          'PRIVATE-TOKEN': this.token!,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`GitLab API error: ${error}`)
+      throw new Error(`GitLab API error: ${error}`);
     }
 
-    return response.json();
+    const repos = await response.json();
+    const repo = repos[0];
+
+    return {
+      name: repo.name,
+      image: repo.location,
+    };
   }
 }
