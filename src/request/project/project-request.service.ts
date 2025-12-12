@@ -279,16 +279,23 @@ export class ProjectRequestService {
     }
 
     // Get image from gitlab
-    const projectId = await this.gitlabService.getProjectByName(
+    const project = await this.gitlabService.getProjectByName(
       repository.name,
     );
-    if (!projectId) {
+    if (!project) {
       throw new BadRequestException('Project not found in GitLab');
     }
 
-    const projectDetail =
-      await this.gitlabService.getImageFromRegistry(projectId);
-    if (!projectDetail) {
+    let projectDetail;
+    try {
+      projectDetail = await this.gitlabService.getImageFromRegistry(project.id);
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to get image from GitLab registry: ${error.message}`,
+      );
+    }
+
+    if (!projectDetail || !projectDetail.name || !projectDetail.image) {
       throw new BadRequestException('No image found in GitLab registry');
     }
 

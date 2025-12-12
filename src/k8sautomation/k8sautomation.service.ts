@@ -14,7 +14,7 @@ export class K8sAutomationService {
     constructor(private readonly httpService: HttpService) {}
 
     async automateK8sDeployment(request: CreateClusterDeploymentRequestDto): Promise<CreateClusterDeploymentResponseDto> {
-        const k8s_base_url = process.env.K8S_AUTOMATION_BASE_API_URL || 'http://localhost:4003/_api/k8s-automation';
+        const k8s_base_url = process.env.K8S_AUTOMATION_BASE_API_URL || 'http://localhost:4003';
         const subpath = '/_api/k8s-automation';
         const path = 'initialize';
 

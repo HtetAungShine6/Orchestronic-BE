@@ -1,18 +1,29 @@
-import { GitlabService } from "src/gitlab/gitlab.service";
-import { ProjectRequestService } from "./project-request.service";
-import { CreateAzureClusterDto } from "./dto/request/create-cluster-azure.dto";
-import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { Body, Controller, Get, Param, Patch, Post, Request, UnauthorizedException } from "@nestjs/common";
-import { BackendJwtPayload, RequestWithCookies } from "src/lib/types";
+import { GitlabService } from 'src/gitlab/gitlab.service';
+import { ProjectRequestService } from './project-request.service';
+import { CreateAzureClusterDto } from './dto/request/create-cluster-azure.dto';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  InternalServerErrorException,
+  Param,
+  Patch,
+  Post,
+  Request,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import * as jwt from 'jsonwebtoken';
-import { CloudProvider } from "@prisma/client";
-import { CreateProjectRequestDto } from "./dto/request/create-project-request.dto";
-import { AddRepositoryToAzureClusterDto } from "./dto/request/update-repository-azure.dto";
-import { GetClusterByIdResponseDto } from "./dto/response/get-cluster-by-id-response-azure.dto";
-import { GetClusterByUserIdResponseDto } from "./dto/response/get-cluster-by-user-id-response.dto";
-import { CreateProjectResponseDto } from "./dto/response/create-project-response.dto";
-import { AzureK8sClusterDto } from "./dto/response/cluster-response-azure.dto";
-import { AddRepositoryToClusterResponseAzureDto } from "./dto/response/add-repository-to-cluster-response-azure.dto";
+import { CloudProvider } from '@prisma/client';
+import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
+import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
+import { GetClusterByIdResponseDto } from './dto/response/get-cluster-by-id-response-azure.dto';
+import { GetClusterByUserIdResponseDto } from './dto/response/get-cluster-by-user-id-response.dto';
+import { CreateProjectResponseDto } from './dto/response/create-project-response.dto';
+import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
+import { AddRepositoryToClusterResponseAzureDto } from './dto/response/add-repository-to-cluster-response-azure.dto';
 
 @Controller('project')
 export class ProjectRequestController {
@@ -93,10 +104,10 @@ export class ProjectRequestController {
         clusterid,
         CloudProvider.AZURE,
       )) as AzureK8sClusterDto | null;
-      if(!response) {
+      if (!response) {
         throw new Error('Azure cluster not found');
       }
-      
+
       const cluster: GetClusterByIdResponseDto = {
         statuscode: 200,
         message: response,
@@ -105,20 +116,17 @@ export class ProjectRequestController {
     } catch (error) {
       throw new Error('Failed to get Azure cluster by ID');
     }
-    
-    
   }
 
   @Get('user/:userid')
   async getAzureClustersByUserId(@Param('userid') userid: string) {
     try {
-      const response = (await this.clusterRequestService.findClusterByUserId(
-        userid,
-      ));
-      if(!response) {
+      const response =
+        await this.clusterRequestService.findClusterByUserId(userid);
+      if (!response) {
         throw new Error('Azure cluster not found');
       }
-      
+
       const cluster: GetClusterByUserIdResponseDto = {
         statuscode: 200,
         data: response,
@@ -149,20 +157,28 @@ export class ProjectRequestController {
     }
 
     try {
-      const response = await this.clusterRequestService.DeployToAzureCluster(request);
+      const response =
+        await this.clusterRequestService.DeployToAzureCluster(request);
 
-      if(!response) {
+      if (!response) {
         throw new Error('No response from deploying to Azure cluster');
       }
-      
+
       const result: AddRepositoryToClusterResponseAzureDto = {
         statuscode: 200,
-        message: "Deployed to Azure cluster successfully",
+        message: 'Deployed to Azure cluster successfully',
       };
       return result;
-    } catch(error) {
-      throw new Error('Failed to deploy to Azure cluster');
+    } catch (error) {
+      console.error('DeployToAzureCluster error:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        error?.message ?? 'Failed to deploy to Azure cluster',
+      );
     }
-    
   }
 }
