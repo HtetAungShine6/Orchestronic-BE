@@ -1,16 +1,20 @@
-import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
-import { AirflowService } from "src/airflow/airflow.service";
-import { DatabaseService } from "src/database/database.service";
-import { GitlabService } from "src/gitlab/gitlab.service";
-import { BackendJwtPayload } from "src/lib/types";
-import { RabbitmqService } from "src/rabbitmq/rabbitmq.service";
-import { CreateAzureClusterDto } from "./dto/request/create-cluster-azure.dto";
-import { ApiBody } from "@nestjs/swagger";
-import { CloudProvider } from "@prisma/client";
-import { CreateProjectRequestDto } from "./dto/request/create-project-request.dto";
-import { AddRepositoryToAzureClusterDto } from "./dto/request/update-repository-azure.dto";
-import { AzureK8sClusterDto } from "./dto/response/cluster-response-azure.dto";
-import { ProjectRequestDto } from "./dto/response/project-request.dto";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { AirflowService } from 'src/airflow/airflow.service';
+import { DatabaseService } from 'src/database/database.service';
+import { GitlabService } from 'src/gitlab/gitlab.service';
+import { BackendJwtPayload } from 'src/lib/types';
+import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
+import { CreateAzureClusterDto } from './dto/request/create-cluster-azure.dto';
+import { ApiBody } from '@nestjs/swagger';
+import { CloudProvider } from '@prisma/client';
+import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
+import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
+import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
+import { ProjectRequestDto } from './dto/response/project-request.dto';
 
 @Injectable()
 export class ProjectRequestService {
@@ -23,9 +27,8 @@ export class ProjectRequestService {
 
   async createProjectRequest(
     user: BackendJwtPayload,
-    request: CreateProjectRequestDto
+    request: CreateProjectRequestDto,
   ) {
-
     try {
       const ownerId = user.id;
       const ownerInDb = await this.databaseService.user.findUnique({
@@ -34,7 +37,9 @@ export class ProjectRequestService {
       });
       const { repository } = request;
       if (!ownerInDb) {
-        throw new BadRequestException('Authenticated user not found in database');
+        throw new BadRequestException(
+          'Authenticated user not found in database',
+        );
       }
 
       const existingRepo = await this.databaseService.repository.findUnique({
@@ -58,7 +63,7 @@ export class ProjectRequestService {
         },
       });
 
-      if(!newRepository) {
+      if (!newRepository) {
         throw new BadRequestException('Failed to create repository');
       }
 
@@ -95,9 +100,9 @@ export class ProjectRequestService {
           repository: true,
           owner: true,
         },
-      })
+      });
 
-      if(!projectRequest) {
+      if (!projectRequest) {
         throw new BadRequestException('Failed to create project request');
       }
 
@@ -108,27 +113,28 @@ export class ProjectRequestService {
         description: projectRequest.description,
         status: projectRequest.status,
         repositoryId: projectRequest.repositoryId,
-        azureK8sClusterId: projectRequest.repository?.azureK8sClusterId ?? undefined,
-        awsK8sClusterId: projectRequest.repository?.awsK8sClusterId ?? undefined,
+        azureK8sClusterId:
+          projectRequest.repository?.azureK8sClusterId ?? undefined,
+        awsK8sClusterId:
+          projectRequest.repository?.awsK8sClusterId ?? undefined,
         ownerId: projectRequest.ownerId,
         resourceId: projectRequest.resourcesId ?? undefined,
         feedback: projectRequest.feedback ?? '',
       };
 
       return response;
-    } catch(error) {
+    } catch (error) {
       throw new Error('Failed to create project request');
     }
   }
 
   @ApiBody({ type: CreateAzureClusterDto })
-  async createCluster(
-    user: BackendJwtPayload,
-    request: CreateAzureClusterDto
-  ) {
+  async createCluster(user: BackendJwtPayload, request: CreateAzureClusterDto) {
     const ownerId = user.id;
     const resources = request.resources;
-    const provider = (resources.cloudProvider || '').toUpperCase() as CloudProvider;
+    const provider = (
+      resources.cloudProvider || ''
+    ).toUpperCase() as CloudProvider;
     const ownerInDb = await this.databaseService.user.findUnique({
       where: { id: ownerId },
       select: { id: true },
@@ -155,19 +161,22 @@ export class ProjectRequestService {
       },
     });
 
-    const updatedClusterRequest = await this.databaseService.projectRequest.update({
-      where: { id: request.clusterRequestId },
-      data: {
-        resources: { connect: { id: newResource.id } },
-      },
-      include: {
-        resources: true,
-        repository: true,
-      },
-    });
-    
-    if(!updatedClusterRequest) {
-      throw new BadRequestException('Failed to update cluster request with resources');
+    const updatedClusterRequest =
+      await this.databaseService.projectRequest.update({
+        where: { id: request.clusterRequestId },
+        data: {
+          resources: { connect: { id: newResource.id } },
+        },
+        include: {
+          resources: true,
+          repository: true,
+        },
+      });
+
+    if (!updatedClusterRequest) {
+      throw new BadRequestException(
+        'Failed to update cluster request with resources',
+      );
     }
     await Promise.all([
       this.rabbitmqService.queueRequest(updatedClusterRequest.id),
@@ -177,9 +186,7 @@ export class ProjectRequestService {
     return updatedClusterRequest;
   }
 
-
   async findClusterByUserId(userId: string, provider: CloudProvider) {
-    
     if (provider === CloudProvider.AWS) {
       return this.databaseService.projectRequest.findMany({
         where: { ownerId: userId },
@@ -222,7 +229,8 @@ export class ProjectRequestService {
       }
 
       const clusters: AzureK8sClusterDto[] = response.flatMap((req) => {
-        const azureClusters = req.resources?.resourceConfig?.AzureK8sCluster ?? [];
+        const azureClusters =
+          req.resources?.resourceConfig?.AzureK8sCluster ?? [];
         return azureClusters.map((cluster) => ({
           id: cluster.id,
           clusterName: cluster.clusterName,
@@ -261,7 +269,7 @@ export class ProjectRequestService {
               },
             },
           },
-        }
+        },
       });
     }
 
@@ -283,9 +291,8 @@ export class ProjectRequestService {
               },
             },
           },
-        }
+        },
       });
-
 
       if (!response) return null;
 
@@ -295,8 +302,12 @@ export class ProjectRequestService {
         nodeCount: response.nodeCount,
         nodeSize: response.nodeSize,
         resourceConfigId: response.resourceConfigId,
-        ...(response.kubeConfig ? { kubeConfig: JSON.stringify(response.kubeConfig) } : {}),
-        ...(response.clusterFqdn ? { clusterFqdn: JSON.stringify(response.clusterFqdn) } : {}),
+        ...(response.kubeConfig
+          ? { kubeConfig: JSON.stringify(response.kubeConfig) }
+          : {}),
+        ...(response.clusterFqdn
+          ? { clusterFqdn: JSON.stringify(response.clusterFqdn) }
+          : {}),
         ...(response.terraformState
           ? { terraformState: JSON.stringify(response.terraformState) }
           : {}),
@@ -306,7 +317,6 @@ export class ProjectRequestService {
     }
     return null;
   }
-
 
   async addRepositoryToAzureCluster(request: AddRepositoryToAzureClusterDto) {
     // get repository
@@ -318,6 +328,28 @@ export class ProjectRequestService {
       throw new BadRequestException('Repository not found');
     }
 
+    // getting GitLab project ID of the repository from GitLab Repo Name
+    const repoGitLabId = await this.gitlabService.getProjectByName(request.repositoryName);
+    if (!repoGitLabId) {
+      throw new BadRequestException(
+        'Repository does not have an associated GitLab project ID',
+      );
+    }
+
+    // getting GitLab Repo Image from GitLab Repo ID
+    const repoImageInGitlab = await this.gitlabService.getProjectByName(
+      request.repositoryName,
+    );
+
+    if (!repoImageInGitlab) {
+      throw new BadRequestException(
+        'Repository not found in GitLab. Please create the repository in GitLab first.',
+      );
+    }
+    // repoImageInGitLab.location
+    
+
+    // get cluster
     const cluster = await this.databaseService.azureK8sCluster.findUnique({
       where: { id: request.clusterId },
     });
@@ -333,8 +365,21 @@ export class ProjectRequestService {
         azureK8sClusterId: request.clusterId,
       },
     });
-    
+
     return response;
   }
 
+  async deployProject(repoName: string, clusterId: string) {
+    const projectId = await this.gitlabService.getProjectByName(repoName);
+    if (!projectId) {
+      throw new BadRequestException('Project not found in GitLab');
+    }
+
+    const projectImage = await this.gitlabService.getImageFromRegistry(projectId)
+    if (!projectImage) {
+      throw new BadRequestException('No image found in GitLab registry');
+    }
+
+    // use projectImage to deploy to cluster
+  }
 }
