@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Status, Role, CloudProvider, RepositoryStatus } from '@prisma/client';
+import { Status, Role, CloudProvider, RepositoryStatus, Resources } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { CreateAzureRequestDto } from './dto/create-request-azure.dto';
 import { ApiBody } from '@nestjs/swagger';
@@ -124,50 +124,54 @@ export class RequestService {
       throw new BadRequestException('One or more collaborators not found');
     }
 
-    // Create resourceConfig with VMs, DBs, STs
-    const resourceConfig = await this.databaseService.resourceConfig.create({
-      data: {
-        AzureVMInstance: {
-          create: (resources.resourceConfig.vms || []).map((vm) => ({
-            name: vm.name,
-            numberOfCores: vm.numberOfCores,
-            memory: vm.memory,
-            os: vm.os,
-            sizeId: vm.sizeId,
-          })),
+    let newResource: Resources | null = null;
+    if(dto.resources)
+    {
+      // Create resourceConfig with VMs, DBs, STs
+      const resourceConfig = await this.databaseService.resourceConfig.create({
+        data: {
+          AzureVMInstance: {
+            create: (resources.resourceConfig.vms || []).map((vm) => ({
+              name: vm.name,
+              numberOfCores: vm.numberOfCores,
+              memory: vm.memory,
+              os: vm.os,
+              sizeId: vm.sizeId,
+            })),
+          },
+          AzureDatabase: {
+            create: resources.resourceConfig.dbs || [],
+          },
+          AzureStorage: {
+            create: resources.resourceConfig.sts || [],
+          },
         },
-        AzureDatabase: {
-          create: resources.resourceConfig.dbs || [],
-        },
-        AzureStorage: {
-          create: resources.resourceConfig.sts || [],
-        },
-      },
-    });
+      });
 
-    // Create Resources linked to resourceConfig
-    const newResource = await this.databaseService.resources.create({
-      data: {
-        name: resources.name,
-        cloudProvider: resources.cloudProvider as CloudProvider,
-        region: resources.region,
-        resourceConfig: { connect: { id: resourceConfig.id } },
-      },
-    });
+      // Create Resources linked to resourceConfig
+      newResource = await this.databaseService.resources.create({
+        data: {
+          name: resources.name,
+          cloudProvider: resources.cloudProvider as CloudProvider,
+          region: resources.region,
+          resourceConfig: { connect: { id: resourceConfig.id } },
+        },
+      });
+    }
 
     // Create Repository with collaborators (using userId)
     const newRepository = await this.databaseService.repository.create({
       data: {
-        name: repository.name,
-        description: repository.description,
-        resources: { connect: { id: newResource.id } },
-        RepositoryCollaborator: {
-          create:
-            repository.collaborators?.map((c) => ({
-              userId: c.userId,
-              gitlabUserId: c.gitlabUserId,
-            })) || [],
-        },
+      name: repository.name,
+      description: repository.description,
+      resources: newResource ? { connect: { id: newResource.id } } : undefined,
+      RepositoryCollaborator: {
+        create:
+        repository.collaborators?.map((c) => ({
+          userId: c.userId,
+          gitlabUserId: c.gitlabUserId,
+        })) || [],
+      },
       },
     });
 
@@ -184,27 +188,27 @@ export class RequestService {
     // Create Request linking owner, repository, resources
     const newRequest = await this.databaseService.request.create({
       data: {
-        description: request.description,
-        displayCode,
-        owner: { connect: { id: ownerId } },
-        repository: { connect: { id: newRepository.id } },
-        resources: { connect: { id: newResource.id } },
+      description: request.description,
+      displayCode,
+      owner: { connect: { id: ownerId } },
+      repository: { connect: { id: newRepository.id } },
+      resources: newResource ? { connect: { id: newResource.id } } : undefined,
       },
       include: {
-        resources: {
+      resources: {
+        include: {
+        resourceConfig: {
           include: {
-            resourceConfig: {
-              include: {
-                AzureVMInstance: true,
-                AzureDatabase: true,
-                AzureStorage: true,
-                AzureK8sCluster: true,
-              },
-            },
+          AzureVMInstance: true,
+          AzureDatabase: true,
+          AzureStorage: true,
+          AzureK8sCluster: true,
           },
         },
-        repository: true,
-        owner: true,
+        },
+      },
+      repository: true,
+      owner: true,
       },
     });
 
@@ -336,6 +340,7 @@ export class RequestService {
     id: string,
     status: RequestStatus,
   ) {
+
     // 1️⃣ Update request status first
     const updateStatus = await this.databaseService.request.update({
       where: { id },
@@ -346,30 +351,16 @@ export class RequestService {
       },
     });
 
-    // If not approved → stop here
+    // 2️⃣ If not approved → stop here
     if (updateStatus.status !== RequestStatus.Approved) {
       return updateStatus;
     }
-
-    // 2️⃣ Fetch resourcesId
+    
+    // 3️⃣ Fetch resourcesId
     const requestEntry = await this.databaseService.request.findUniqueOrThrow({
       where: { id },
       select: { resourcesId: true },
     });
-
-    if (!requestEntry.resourcesId) {
-      throw new Error(`No resourcesId found for request ${id}`);
-    }
-
-    // 3️⃣ Fetch cloud provider
-    const resourceInfo = await this.databaseService.resources.findUniqueOrThrow(
-      {
-        where: { id: requestEntry.resourcesId },
-        select: { cloudProvider: true },
-      },
-    );
-
-    const cloudProvider = resourceInfo.cloudProvider;
 
     // 4️⃣ Get repository + collaborators (with gitlabUserId!)
     const repository = await this.databaseService.repository.findUniqueOrThrow({
@@ -443,15 +434,27 @@ export class RequestService {
       data: { status: RepositoryStatus.Created },
     });
 
-    // 🔟 Trigger CI/CD + cloud provisioning
-    if (cloudProvider === CloudProvider.AWS) {
-      this.rabbitmqService.queueRequest(id);
-      this.airflowService.triggerDag(user, 'AWS_Resources');
-    } else if (cloudProvider === CloudProvider.AZURE) {
-      this.rabbitmqService.queueRequest(id);
-      this.airflowService.triggerDag(user, 'AZURE_Resource_Group');
-    } else {
-      throw new Error(`Unsupported cloudProvider: ${cloudProvider}`);
+    if (requestEntry.resourcesId !== null && requestEntry.resourcesId !== undefined) {
+      // 🔟 Fetch cloud provider
+      const resourceInfo = await this.databaseService.resources.findUniqueOrThrow(
+        {
+          where: { id: requestEntry.resourcesId },
+          select: { cloudProvider: true },
+        },
+      );
+
+      const cloudProvider = resourceInfo.cloudProvider;
+
+      // 1️⃣1️⃣ Trigger CI/CD + cloud provisioning
+      if (cloudProvider === CloudProvider.AWS) {
+        this.rabbitmqService.queueRequest(id);
+        this.airflowService.triggerDag(user, 'AWS_Resources');
+      } else if (cloudProvider === CloudProvider.AZURE) {
+        this.rabbitmqService.queueRequest(id);
+        this.airflowService.triggerDag(user, 'AZURE_Resource_Group');
+      } else {
+        throw new Error(`Unsupported cloudProvider: ${cloudProvider}`);
+      }
     }
 
     return updateStatus;

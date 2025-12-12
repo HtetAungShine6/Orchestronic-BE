@@ -4,7 +4,7 @@ import { CreateAzureClusterResourceDto } from "src/resource/cluster-resource/dto
 export class CreateAzureClusterDto {
     @IsString()
     @ApiProperty({ example: 'uuid-of-cluster-request' })
-    clusterRequestId: string;
+    requestId: string;
 
     @IsString()
     @IsOptional()

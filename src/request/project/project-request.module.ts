@@ -9,6 +9,7 @@ import { HttpModule } from '@nestjs/axios';
 import { DatabaseModule } from 'src/database/database.module';
 import { ProjectRequestController } from './project-request.controller';
 import { ProjectRequestService } from './project-request.service';
+import { K8sAutomationModule } from 'src/k8sautomation/k8sautomation.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ProjectRequestService } from './project-request.service';
     PassportModule.register({
       defaultStrategy: 'AzureAD',
     }),
+    K8sAutomationModule,
   ],
   controllers: [ProjectRequestController],
   providers: [
