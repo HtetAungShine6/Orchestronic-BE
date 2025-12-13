@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { RequestDto } from './dto/request.dto';
 import { RabbitmqService } from './rabbitmq.service';
 import { ApiOperation } from '@nestjs/swagger';
+import { ResourceDto } from './dto/resource.dto';
 
 @Controller('rabbitmq')
 export class RabbitmqController {
@@ -21,6 +22,14 @@ export class RabbitmqController {
   })
   queueRequest(@Body() requestDto: RequestDto) {
     return this.queueService.queueRequest(requestDto.requestId);
+  }
+
+  @Post('resource')
+  @ApiOperation({
+    summary: 'Queue a new resource',
+  })
+  queueResource(@Body() requestDto: ResourceDto) {
+    return this.queueService.queueResource(requestDto.resourceId);
   }
 
   @Post('destroy')

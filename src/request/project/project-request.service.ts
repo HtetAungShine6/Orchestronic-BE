@@ -162,28 +162,28 @@ export class ProjectRequestService {
       },
     });
 
-    const updatedClusterRequest = await this.databaseService.request.update({
-      where: { id: request.requestId },
-      data: {
-        resources: { connect: { id: newResource.id } },
-      },
-      include: {
-        resources: true,
-        repository: true,
-      },
-    });
+    // const updatedClusterRequest = await this.databaseService.request.update({
+    //   where: { id: request.requestId },
+    //   data: {
+    //     resources: { connect: { id: newResource.id } },
+    //   },
+    //   include: {
+    //     resources: true,
+    //     repository: true,
+    //   },
+    // });
 
-    if (!updatedClusterRequest) {
-      throw new BadRequestException(
-        'Failed to update cluster request with resources',
-      );
-    }
+    // if (!updatedClusterRequest) {
+    //   throw new BadRequestException(
+    //     'Failed to update cluster request with resources',
+    //   );
+    // }
     await Promise.all([
-      this.rabbitmqService.queueRequest(updatedClusterRequest.id),
-      this.airflowService.triggerDag(user, 'AZURE_Resource_Group'),
+      this.rabbitmqService.queueResource(newResource.id),
+      this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
     ]);
 
-    return updatedClusterRequest;
+    return newResource;
   }
 
   async findClusterByUserId(userId: string) {
