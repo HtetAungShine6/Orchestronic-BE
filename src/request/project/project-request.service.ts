@@ -309,6 +309,10 @@ export class ProjectRequestService {
     }
 
     // TODO: add kubeconfig to k8s automation service by cluster id
+    const kubeConfig = cluster.kubeConfig;
+    if (!kubeConfig) {
+      throw new BadRequestException('Kubeconfig not found in cluster');
+    }
 
     // Deploy into cluster
     const deploymentRequest = new CreateClusterDeploymentRequestDto();
@@ -317,6 +321,7 @@ export class ProjectRequestService {
     deploymentRequest.port = request.port;
     deploymentRequest.usePrivateRegistry =
       request.usePrivateRegistry ?? undefined;
+    deploymentRequest.kubeConfig = kubeConfig;
 
     const deploymentResponse =
       await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);

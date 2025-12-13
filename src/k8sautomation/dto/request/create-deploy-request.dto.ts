@@ -24,4 +24,10 @@ export class CreateClusterDeploymentRequestDto {
         required: false,
     })
     usePrivateRegistry?: boolean;
+
+    @ApiProperty({
+        description: 'Kubeconfig content for the target Kubernetes cluster',
+        example: 'apiVersion: v1\nclusters:\n- cluster:\n    certificate-authority-data: ...',
+    })
+    kubeConfig: string;
 }
