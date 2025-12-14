@@ -23,6 +23,8 @@ import { GetClusterByIdResponseDto } from './dto/response/get-cluster-by-id-resp
 import { GetClusterByUserIdResponseDto } from './dto/response/get-cluster-by-user-id-response.dto';
 import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
 import { AddRepositoryToClusterResponseAzureDto } from './dto/response/add-repository-to-cluster-response-azure.dto';
+import { th } from '@faker-js/faker/.';
+import { UpdateAzureClusterDto } from './dto/request/update-cluster-azure.dto';
 
 @Controller('project')
 export class ProjectRequestController {
@@ -89,9 +91,50 @@ export class ProjectRequestController {
     try {
       const decoded = jwt.verify(token, secret) as unknown;
       const payload = decoded as BackendJwtPayload;
-      const response = await this.clusterRequestService.createCluster(payload, request);
+      const response = await this.clusterRequestService.createCluster(
+        payload,
+        request,
+      );
       if (!response) {
         throw new Error('Failed to create Azure cluster');
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Request Controller: Error decoding token');
+      throw new Error('Invalid token - unable to process');
+    }
+  }
+
+  @Patch('/azure')
+  @ApiOperation({
+    summary: 'Update an existing Azure cluster',
+  })
+  @ApiBody({ type: UpdateAzureClusterDto })
+  async updateAzureClusterRequest(
+    @Request() req: RequestWithCookies,
+    @Body() updateClusterDto: UpdateAzureClusterDto,
+  ) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as unknown;
+      const payload = decoded as BackendJwtPayload;
+      const response =
+        await this.clusterRequestService.updateClusterRequestStatus(
+          payload,
+          updateClusterDto,
+        );
+      if (!response) {
+        throw new Error('Failed to update Azure cluster');
       }
 
       return response;
@@ -122,22 +165,38 @@ export class ProjectRequestController {
     }
   }
 
-  @Get('user/:userid')
-  async getAzureClustersByUserId(@Param('userid') userid: string) {
+  @Get('me/cluster')
+  async getAzureClustersByUserId(@Request() req: RequestWithCookies) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
     try {
+      const decoded = jwt.verify(token, secret) as unknown;
+      const payload = decoded as BackendJwtPayload;
       const response =
-        await this.clusterRequestService.findClusterByUserId(userid);
+        await this.clusterRequestService.findClustersByUserId(payload);
       if (!response) {
-        throw new Error('Azure cluster not found');
+        throw new Error('No Azure clusters found for user');
       }
 
-      const cluster: GetClusterByUserIdResponseDto = {
-        statuscode: 200,
-        data: response,
-      };
-      return cluster;
+      return response;
     } catch (error) {
-      throw new Error('Failed to get Azure cluster by ID');
+      console.error('Get Cluster by user id error:', error);
+
+      if (error instanceof HttpException) {
+        throw error; // preserve status code + message
+      }
+
+      throw new InternalServerErrorException(
+        error?.message ?? 'Failed to get clusters for user',
+      );
     }
   }
 
@@ -184,5 +243,44 @@ export class ProjectRequestController {
         error?.message ?? 'Failed to deploy to Azure cluster',
       );
     }
+  }
+
+  @Get('/pending-clusters')
+  @ApiOperation({
+    summary: 'Get all pending cluster requests',
+  })
+  async getAllPendingClusters() {
+    const response = await this.clusterRequestService.findAllPendingClusters();
+    if (!response) {
+      throw new Error('No pending clusters found');
+    }
+
+    return response;
+  }
+
+  @Get('/resources/:clusterId')
+  @ApiOperation({
+    summary: 'Get resources by cluster ID',
+  })
+  async getClusterResourcesById(@Param('clusterId') clusterId: string) {
+    const response = await this.clusterRequestService.findClusterResourcesById(clusterId);
+    if (!response) {
+      throw new Error('No resources found for cluster');
+    }
+
+    return response;
+  }
+
+  @Get('/resource-config/:clusterId')
+  @ApiOperation({
+    summary: 'Get resource config by cluster ID',
+  })
+  async getClusterResourceConfigById(@Param('clusterId') clusterId: string) {
+    const response = await this.clusterRequestService.findClusterResourceConfigById(clusterId);
+    if (!response) {
+      throw new Error('No resource config found for cluster');
+    }
+
+    return response;
   }
 }
