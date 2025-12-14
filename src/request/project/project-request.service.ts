@@ -14,10 +14,11 @@ import { CloudProvider, deployStatus, Status } from '@prisma/client';
 import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
 import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
 import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
-import { ProjectRequestDto } from './dto/response/project-request.dto';
+import { NewClusterDto } from './dto/response/new-cluster-azure.dto';
 import { K8sAutomationService } from 'src/k8sautomation/k8sautomation.service';
 import { CreateClusterDeploymentRequestDto } from 'src/k8sautomation/dto/request/create-deploy-request.dto';
 import { UserClustersPayloadDto } from './dto/response/get-cluster-by-user-id-response.dto';
+import { CreateClusterAzureResponseDto } from './dto/response/create-cluster-azure-response.dto';
 
 @Injectable()
 export class ProjectRequestService {
@@ -183,7 +184,15 @@ export class ProjectRequestService {
       this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
     ]);
 
-    return newResource;
+    // Cannot retrieve cluster ID here, will be updated after workflow is done
+    const clusterResponse = new CreateClusterAzureResponseDto();
+    clusterResponse.statuscode = 201;
+    
+    const newClusterDto = new NewClusterDto();
+    newClusterDto.resourceId = newResource.id;
+    clusterResponse.message = newClusterDto;
+
+    return clusterResponse;
   }
 
   async findClusterByUserId(userId: string) {

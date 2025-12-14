@@ -21,7 +21,6 @@ import { CreateProjectRequestDto } from './dto/request/create-project-request.dt
 import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
 import { GetClusterByIdResponseDto } from './dto/response/get-cluster-by-id-response-azure.dto';
 import { GetClusterByUserIdResponseDto } from './dto/response/get-cluster-by-user-id-response.dto';
-import { CreateProjectResponseDto } from './dto/response/create-project-response.dto';
 import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
 import { AddRepositoryToClusterResponseAzureDto } from './dto/response/add-repository-to-cluster-response-azure.dto';
 
@@ -90,7 +89,12 @@ export class ProjectRequestController {
     try {
       const decoded = jwt.verify(token, secret) as unknown;
       const payload = decoded as BackendJwtPayload;
-      return this.clusterRequestService.createCluster(payload, request);
+      const response = await this.clusterRequestService.createCluster(payload, request);
+      if (!response) {
+        throw new Error('Failed to create Azure cluster');
+      }
+
+      return response;
     } catch (error) {
       console.error('Request Controller: Error decoding token');
       throw new Error('Invalid token - unable to process');
