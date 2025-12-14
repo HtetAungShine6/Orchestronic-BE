@@ -6,6 +6,7 @@ export class RabbitmqService {
   constructor(
     @Inject('RABBITMQ_SERVICE_1') private rabbitClient1: ClientProxy,
     @Inject('RABBITMQ_SERVICE_2') private rabbitClient2: ClientProxy,
+    @Inject('RABBITMQ_SERVICE_3') private rabbitClient3: ClientProxy,
   ) {}
 
   queueRequest(requestId: string) {
@@ -20,6 +21,13 @@ export class RabbitmqService {
     console.log(`(Destroy) Request ID sent to RabbitMQ: ${requestId}`);
 
     return { message: 'Destroy Request queued successfully', requestId };
+  }
+
+  queueResource(resourceId: string) {
+    this.rabbitClient3.emit('resource', { resourceId });
+    console.log(`(Queue) Resource ID sent to RabbitMQ: ${resourceId}`);
+
+    return { message: 'Queue Resource queued successfully', resourceId };
   }
 
   // async getRequest() {
