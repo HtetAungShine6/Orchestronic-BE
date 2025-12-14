@@ -3,10 +3,11 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+import * as jwt from 'jsonwebtoken';
 import { AirflowService } from 'src/airflow/airflow.service';
 import { DatabaseService } from 'src/database/database.service';
 import { GitlabService } from 'src/gitlab/gitlab.service';
-import { BackendJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
 import { CreateAzureClusterDto } from './dto/request/create-cluster-azure.dto';
 import { ApiBody } from '@nestjs/swagger';
@@ -19,6 +20,7 @@ import { K8sAutomationService } from 'src/k8sautomation/k8sautomation.service';
 import { CreateClusterDeploymentRequestDto } from 'src/k8sautomation/dto/request/create-deploy-request.dto';
 import { UserClustersPayloadDto } from './dto/response/get-cluster-by-user-id-response.dto';
 import { CreateClusterAzureResponseDto } from './dto/response/create-cluster-azure-response.dto';
+import { UpdateAzureClusterDto } from './dto/request/update-cluster-azure.dto';
 
 @Injectable()
 export class ProjectRequestService {
@@ -163,6 +165,13 @@ export class ProjectRequestService {
       },
     });
 
+    return await this.databaseService.clusterRequest.create({
+      data: {
+        ownerId: ownerInDb.id,
+        resourceId: newResource.id,
+      },
+    });
+
     // const updatedClusterRequest = await this.databaseService.request.update({
     //   where: { id: request.requestId },
     //   data: {
@@ -179,33 +188,72 @@ export class ProjectRequestService {
     //     'Failed to update cluster request with resources',
     //   );
     // }
-    await Promise.all([
-      this.rabbitmqService.queueResource(newResource.id),
-      this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
-    ]);
 
-    // Cannot retrieve cluster ID here, will be updated after workflow is done
+    // reuse that in patch route later
+    // await Promise.all([
+    //   this.rabbitmqService.queueResource(newResource.id),
+    //   this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
+    // ]);
+
+    // // Cannot retrieve cluster ID here, will be updated after workflow is done
+    // const clusterResponse = new CreateClusterAzureResponseDto();
+    // clusterResponse.statuscode = 201;
+
+    // const newClusterDto = new NewClusterDto();
+    // newClusterDto.resourceId = newResource.id;
+    // clusterResponse.message = newClusterDto;
+
+    // return clusterResponse;
+  }
+
+  async updateClusterRequestStatus(
+    user: BackendJwtPayload,
+    updateClusterDto: UpdateAzureClusterDto,
+  ) {
+    const clusterRequest = await this.databaseService.clusterRequest.findUnique(
+      {
+        where: { id: updateClusterDto.clusterRequestId },
+      },
+    );
+
+    if (!clusterRequest) {
+      throw new BadRequestException('Cluster request not found');
+    }
+
+    // update status first
+    await this.databaseService.clusterRequest.update({
+      where: { id: clusterRequest.id },
+      data: { status: updateClusterDto.status },
+    });
+
+    if (updateClusterDto.status === Status.Approved) {
+      await Promise.all([
+        this.rabbitmqService.queueResource(clusterRequest.resourceId),
+        this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
+      ]);
+    }
+
     const clusterResponse = new CreateClusterAzureResponseDto();
     clusterResponse.statuscode = 201;
-    
+
     const newClusterDto = new NewClusterDto();
-    newClusterDto.resourceId = newResource.id;
+    newClusterDto.clusterReqId = clusterRequest.id;
     clusterResponse.message = newClusterDto;
 
     return clusterResponse;
   }
 
-  async findClusterByUserId(userId: string) {
+  async findClusterByUserId(user: BackendJwtPayload) {
     const awsClusters = await this.databaseService.awsK8sCluster.findMany({
       where: {
-        resourceConfig: { resources: { request: { ownerId: userId } } },
+        resourceConfig: { resources: { request: { ownerId: user.id } } },
       },
       include: { resourceConfig: { include: { resources: true } } },
     });
 
     const azureClusters = await this.databaseService.azureK8sCluster.findMany({
       where: {
-        resourceConfig: { resources: { request: { ownerId: userId } } },
+        resourceConfig: { resources: { request: { ownerId: user.id } } },
       },
       include: { resourceConfig: { include: { resources: true } } },
     });
@@ -288,9 +336,7 @@ export class ProjectRequestService {
     }
 
     // Get image from gitlab
-    const project = await this.gitlabService.getProjectByName(
-      repository.name,
-    );
+    const project = await this.gitlabService.getProjectByName(repository.name);
     if (!project) {
       throw new BadRequestException('Project not found in GitLab');
     }
@@ -373,5 +419,75 @@ export class ProjectRequestService {
     });
 
     return response;
+  }
+
+  async updateDeployToAzureCluster() {}
+
+  async findClustersByUserId(req: BackendJwtPayload) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        ownerId: req.id,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return resources;
+  }
+
+  async findAllPendingClusters() {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        status: Status.Pending,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return resources;
+  }
+
+  async findClusterResourcesById(clusterId: string) {
+    const resource = await this.databaseService.resources.findUnique({
+      where: { id: clusterId },
+    });
+
+    if (!resource) {
+      throw new BadRequestException('Resource not found');
+    }
+
+    return resource;
+  }
+
+  async findClusterResourceConfigById(clusterId: string) {
+    const resource = await this.databaseService.resources.findUnique({
+      where: { id: clusterId },
+    });
+
+    const resourceConfig = await this.databaseService.resourceConfig.findUnique({
+      where: { id: resource?.resourceConfigId },
+    });
+
+    const cluster = await this.databaseService.azureK8sCluster.findMany({
+      where: { resourceConfigId: resourceConfig?.id },
+    });
+
+    if (!cluster) {
+      throw new BadRequestException('Resource config not found');
+    }
+
+    return cluster;
   }
 }
