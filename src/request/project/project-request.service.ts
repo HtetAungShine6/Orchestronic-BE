@@ -441,6 +441,25 @@ export class ProjectRequestService {
     return resources;
   }
 
+  async findClustersByUserIdAndStatus(req: BackendJwtPayload, status: Status) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        ownerId: req.id,
+        status: status,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return resources;
+  }
+
   async findAllPendingClusters() {
     const clusterRequests = await this.databaseService.clusterRequest.findMany({
       where: {
@@ -456,7 +475,52 @@ export class ProjectRequestService {
       },
     });
 
-    return resources;
+    return clusterRequests.map((cr) => ({
+      clusterRequestId: cr.id,
+      ...resources.find((r) => r.id === cr.resourceId),
+    }));
+  }
+
+  async findAllApprovedClusters() {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        status: Status.Approved,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return clusterRequests.map((cr) => ({
+      clusterRequestId: cr.id,
+      ...resources.find((r) => r.id === cr.resourceId),
+    }));
+  }
+
+  async findAllClustersWithStatus(status: Status) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        status: status,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return clusterRequests.map((cr) => ({
+      clusterRequestId: cr.id,
+      ...resources.find((r) => r.id === cr.resourceId),
+    }));
   }
 
   async findClusterResourcesById(clusterId: string) {
@@ -476,9 +540,11 @@ export class ProjectRequestService {
       where: { id: clusterId },
     });
 
-    const resourceConfig = await this.databaseService.resourceConfig.findUnique({
-      where: { id: resource?.resourceConfigId },
-    });
+    const resourceConfig = await this.databaseService.resourceConfig.findUnique(
+      {
+        where: { id: resource?.resourceConfigId },
+      },
+    );
 
     const cluster = await this.databaseService.azureK8sCluster.findMany({
       where: { resourceConfigId: resourceConfig?.id },
@@ -489,5 +555,44 @@ export class ProjectRequestService {
     }
 
     return cluster;
+  }
+
+  async findClusterRequestsByReqId(requestId: string) {
+    const clusterRequest = await this.databaseService.clusterRequest.findUnique(
+      {
+        where: { id: requestId },
+      },
+    );
+
+    if (!clusterRequest) {
+      throw new BadRequestException('Cluster request not found');
+    }
+
+    return clusterRequest;
+  }
+
+  async findAllClusterRequests() {
+    const clusterRequests =
+      await this.databaseService.clusterRequest.findMany();
+
+    if (!clusterRequests || clusterRequests.length === 0) {
+      throw new BadRequestException('No cluster requests found');
+    }
+
+    return clusterRequests;
+  }
+
+  async findResourceConfigById(resourceConfigId: string) {
+    const resourceConfig = await this.databaseService.resourceConfig.findMany(
+      {
+        where: { id: resourceConfigId },
+      },
+    );
+
+    if (!resourceConfig) {
+      throw new BadRequestException('Resource config not found');
+    }
+
+    return resourceConfig;
   }
 }

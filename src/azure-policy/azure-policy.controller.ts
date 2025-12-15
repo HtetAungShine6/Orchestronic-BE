@@ -270,4 +270,32 @@ export class AzurePolicyController {
       throw new UnauthorizedException('Invalid token');
     }
   }
+
+  @Get('cluster')
+  @ApiOperation({
+    summary: 'Get all Cluster Policies',
+    description: 'Retrieves all policies for Cluster.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cluster policies retrieved successfully',
+  })
+  getPolicyClusterAzure(@Request() req: RequestWithCookies) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      return this.policyService.getPolicyClusterAzure();
+    } catch (error) {
+      console.error('Error decoding token:', error);
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
 }
