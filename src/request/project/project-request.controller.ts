@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import * as jwt from 'jsonwebtoken';
-import { CloudProvider } from '@prisma/client';
+import { CloudProvider, Status } from '@prisma/client';
 import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
 import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
 import { GetClusterByIdResponseDto } from './dto/response/get-cluster-by-id-response-azure.dto';
@@ -106,6 +106,45 @@ export class ProjectRequestController {
     }
   }
 
+  // @Patch('/azure')
+  // @ApiOperation({
+  //   summary: 'Update an existing Azure cluster',
+  // })
+  // @ApiBody({ type: UpdateAzureClusterDto })
+  // async updateAzureClusterRequest(
+  //   @Request() req: RequestWithCookies,
+  //   @Body() updateClusterDto: UpdateAzureClusterDto,
+  // ) {
+  //   const token = req.cookies?.['access_token'];
+  //   if (token === undefined) {
+  //     throw new UnauthorizedException('No access token');
+  //   }
+
+  //   const secret = process.env.JWT_SECRET;
+  //   if (!secret) {
+  //     throw new Error('JWT_SECRET not defined');
+  //   }
+
+  //   try {
+  //     const decoded = jwt.verify(token, secret) as unknown;
+  //     const payload = decoded as BackendJwtPayload;
+  //     const response =
+  //       await this.clusterRequestService.updateClusterRequestStatus(
+  //         payload,
+  //         updateClusterDto,
+  //       );
+  //     if (!response) {
+  //       throw new Error('Failed to update Azure cluster');
+  //     }
+
+  //     return response;
+  //   } catch (error) {
+  //     console.error('Request Controller: Error decoding token');
+  //     throw new Error('Invalid token - unable to process');
+  //   }
+  // }
+
+  // project-request.controller.ts - updateAzureClusterRequest method
   @Patch('/azure')
   @ApiOperation({
     summary: 'Update an existing Azure cluster',
@@ -116,53 +155,76 @@ export class ProjectRequestController {
     @Body() updateClusterDto: UpdateAzureClusterDto,
   ) {
     const token = req.cookies?.['access_token'];
+
+    console.log('=== Update Cluster Request Debug ===');
+    console.log('Token exists:', !!token);
+    console.log('Request body:', updateClusterDto);
+
     if (token === undefined) {
+      console.error('No access token found in cookies');
       throw new UnauthorizedException('No access token');
     }
 
     const secret = process.env.JWT_SECRET;
     if (!secret) {
+      console.error('JWT_SECRET not defined in environment');
       throw new Error('JWT_SECRET not defined');
     }
 
     try {
       const decoded = jwt.verify(token, secret) as unknown;
       const payload = decoded as BackendJwtPayload;
+
+      console.log('Token decoded successfully, user:', payload.id);
+      console.log(
+        'Updating cluster request:',
+        updateClusterDto.clusterRequestId,
+      );
+
       const response =
         await this.clusterRequestService.updateClusterRequestStatus(
           payload,
           updateClusterDto,
         );
+
       if (!response) {
         throw new Error('Failed to update Azure cluster');
       }
 
+      console.log('Cluster updated successfully');
       return response;
     } catch (error) {
-      console.error('Request Controller: Error decoding token');
-      throw new Error('Invalid token - unable to process');
+      if (error.name === 'TokenExpiredError') {
+        console.error('Token has expired:', error.message);
+        throw new UnauthorizedException(
+          'Token has expired. Please log in again.',
+        );
+      } else if (error.name === 'JsonWebTokenError') {
+        console.error('Invalid token:', error.message);
+        throw new UnauthorizedException('Invalid token. Please log in again.');
+      } else {
+        console.error('Request Controller: Error processing request:', error);
+        throw new Error(`Unable to process request: ${error.message}`);
+      }
     }
   }
 
   @Get('cluster/:clusterid')
   async getAzureClusterRequestById(@Param('clusterid') clusterid: string) {
-    try {
-      const response = (await this.clusterRequestService.findClusterById(
-        clusterid,
-        CloudProvider.AZURE,
-      )) as AzureK8sClusterDto | null;
-      if (!response) {
-        throw new Error('Azure cluster not found');
-      }
+    return this.clusterRequestService.findClusterRequestsByReqId(clusterid);
+  }
 
-      const cluster: GetClusterByIdResponseDto = {
-        statuscode: 200,
-        message: response,
-      };
-      return cluster;
-    } catch (error) {
-      throw new Error('Failed to get Azure cluster by ID');
+  @Get('clusters')
+  @ApiOperation({
+    summary: 'Get all Azure clusters',
+  })
+  async getAllAzureClusters() {
+    const response = await this.clusterRequestService.findAllClusterRequests();
+    if (!response) {
+      throw new Error('No Azure clusters found');
     }
+
+    return response;
   }
 
   @Get('me/cluster')
@@ -192,6 +254,50 @@ export class ProjectRequestController {
 
       if (error instanceof HttpException) {
         throw error; // preserve status code + message
+      }
+
+      throw new InternalServerErrorException(
+        error?.message ?? 'Failed to get clusters for user',
+      );
+    }
+  }
+
+  @Get('me/cluster/:status')
+  @ApiOperation({
+    summary: 'Get clusters by user ID and status',
+  })
+  async getAzureClustersByUserIdAndStatus(
+    @Request() req: RequestWithCookies,
+    @Param('status') status: Status,
+  ) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as unknown;
+      const payload = decoded as BackendJwtPayload;
+      const response =
+        await this.clusterRequestService.findClustersByUserIdAndStatus(
+          payload,
+          status,
+        );
+      if (!response) {
+        throw new Error('No Azure clusters found for user');
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Get Cluster by user id error:', error);
+
+      if (error instanceof HttpException) {
+        throw error; 
       }
 
       throw new InternalServerErrorException(
@@ -258,12 +364,27 @@ export class ProjectRequestController {
     return response;
   }
 
+  @Get('/approved-clusters')
+  @ApiOperation({
+    summary: 'Get all approved cluster requests',
+  })
+  async getAllApprovedClusters() {
+    const response = await this.clusterRequestService.findAllApprovedClusters();
+    if (!response) {
+      throw new Error('No approved clusters found');
+    }
+
+    return response;
+  }
+
+
   @Get('/resources/:clusterId')
   @ApiOperation({
     summary: 'Get resources by cluster ID',
   })
   async getClusterResourcesById(@Param('clusterId') clusterId: string) {
-    const response = await this.clusterRequestService.findClusterResourcesById(clusterId);
+    const response =
+      await this.clusterRequestService.findClusterResourcesById(clusterId);
     if (!response) {
       throw new Error('No resources found for cluster');
     }
@@ -276,9 +397,24 @@ export class ProjectRequestController {
     summary: 'Get resource config by cluster ID',
   })
   async getClusterResourceConfigById(@Param('clusterId') clusterId: string) {
-    const response = await this.clusterRequestService.findClusterResourceConfigById(clusterId);
+    const response =
+      await this.clusterRequestService.findClusterResourceConfigById(clusterId);
     if (!response) {
       throw new Error('No resource config found for cluster');
+    }
+
+    return response;
+  }
+
+  @Get('/clusters/:status')
+  @ApiOperation({
+    summary: 'Get clusters by status',
+  })
+  async getClustersByStatus(@Param('status') status: Status) {
+    const response =
+      await this.clusterRequestService.findAllClustersWithStatus(status);
+    if (!response) {
+      throw new Error('No clusters found for the specified status');
     }
 
     return response;

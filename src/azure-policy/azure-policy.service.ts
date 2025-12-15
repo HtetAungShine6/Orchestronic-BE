@@ -99,4 +99,17 @@ export class AzurePolicyService {
       throw new Error('Failed to fetch ST policies');
     }
   }
+
+  getPolicyClusterAzure() {
+    try {
+      return this.databaseService.azurePolicyVM.findFirst({
+        where: {
+          name: 'Standard_D2s_v3',
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching VM policy:', error);
+      throw new Error('Failed to fetch VM policy');
+    }
+  }
 }
