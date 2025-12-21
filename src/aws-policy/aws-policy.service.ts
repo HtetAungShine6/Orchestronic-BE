@@ -69,4 +69,16 @@ export class AwsPolicyService {
       },
     });
   }
+
+  getPolicyClusterAWS() {
+    try {
+      return this.databaseService.awsPolicyVM.findFirst({
+        where: {
+          name: ''
+        }
+      })
+    } catch (error) {
+      throw new Error('Failed to fetch VM policy');
+    }
+  }
 }
