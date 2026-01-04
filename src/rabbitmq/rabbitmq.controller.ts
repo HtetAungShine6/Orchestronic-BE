@@ -39,4 +39,12 @@ export class RabbitmqController {
   destroyRequest(@Body() requestDto: RequestDto) {
     return this.queueService.destroyRequest(requestDto.requestId);
   }
+
+  @Post('destroyK8s')
+  @ApiOperation({
+    summary: 'Queue a new destroy K8s request',
+  })
+  destroyK8sRequest(@Body() resourceDto: ResourceDto) {
+    return this.queueService.destroyK8sRequest(resourceDto.resourceId);
+  }
 }

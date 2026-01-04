@@ -1,6 +1,5 @@
 import { GitlabService } from 'src/gitlab/gitlab.service';
 import { ProjectRequestService } from './project-request.service';
-import { CreateAzureClusterDto } from './dto/request/create-cluster-azure.dto';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   Body,
@@ -18,13 +17,14 @@ import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import * as jwt from 'jsonwebtoken';
 import { CloudProvider, Status } from '@prisma/client';
 import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
-import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
+import { AddRepositoryToK8sClusterDto } from './dto/request/update-repository.dto';
 import { GetClusterByIdResponseDto } from './dto/response/get-cluster-by-id-response-azure.dto';
 import { GetClusterByUserIdResponseDto } from './dto/response/get-cluster-by-user-id-response.dto';
 import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
 import { AddRepositoryToClusterResponseAzureDto } from './dto/response/add-repository-to-cluster-response-azure.dto';
 import { th } from '@faker-js/faker/.';
-import { UpdateAzureClusterDto } from './dto/request/update-cluster-azure.dto';
+import { CreateClusterRequestDto } from './dto/request/create-cluster-request.dto';
+import { UpdateClusterRequestStatusDto } from './dto/request/update-cluster.dto';
 
 @Controller('project')
 export class ProjectRequestController {
@@ -73,10 +73,10 @@ export class ProjectRequestController {
   @ApiOperation({
     summary: 'Create a new Azure cluster',
   })
-  @ApiBody({ type: CreateAzureClusterDto })
-  async createClusterRequest(
+  @ApiBody({ type: CreateClusterRequestDto })
+  async createAzureClusterRequest(
     @Request() req: RequestWithCookies,
-    @Body() request: CreateAzureClusterDto,
+    @Body() request: CreateClusterRequestDto,
   ) {
     const token = req.cookies?.['access_token'];
     if (token === undefined) {
@@ -97,6 +97,43 @@ export class ProjectRequestController {
       );
       if (!response) {
         throw new Error('Failed to create Azure cluster');
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Request Controller: Error decoding token');
+      throw new Error('Invalid token - unable to process');
+    }
+  }
+
+  @Post('/aws')
+  @ApiOperation({
+    summary: 'Create a new AWS cluster',
+  })
+  @ApiBody({ type: CreateClusterRequestDto })
+  async createAWSClusterRequest(
+    @Request() req: RequestWithCookies,
+    @Body() request: CreateClusterRequestDto,
+  ) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as unknown;
+      const payload = decoded as BackendJwtPayload;
+      const response = await this.clusterRequestService.createCluster(
+        payload,
+        request,
+      );
+      if (!response) {
+        throw new Error('Failed to create AWS cluster');
       }
 
       return response;
@@ -145,14 +182,14 @@ export class ProjectRequestController {
   // }
 
   // project-request.controller.ts - updateAzureClusterRequest method
-  @Patch('/azure')
+  @Patch()
   @ApiOperation({
-    summary: 'Update an existing Azure cluster',
+    summary: 'Update an existing K8s cluster',
   })
-  @ApiBody({ type: UpdateAzureClusterDto })
+  @ApiBody({ type: UpdateClusterRequestStatusDto })
   async updateAzureClusterRequest(
     @Request() req: RequestWithCookies,
-    @Body() updateClusterDto: UpdateAzureClusterDto,
+    @Body() updateClusterDto: UpdateClusterRequestStatusDto,
   ) {
     const token = req.cookies?.['access_token'];
 
@@ -188,7 +225,7 @@ export class ProjectRequestController {
         );
 
       if (!response) {
-        throw new Error('Failed to update Azure cluster');
+        throw new Error('Failed to update K8s cluster');
       }
 
       console.log('Cluster updated successfully');
@@ -208,6 +245,8 @@ export class ProjectRequestController {
       }
     }
   }
+
+
 
   @Get('cluster/:clusterid')
   async getAzureClusterRequestById(@Param('clusterid') clusterid: string) {
@@ -306,14 +345,14 @@ export class ProjectRequestController {
     }
   }
 
-  @Patch('deploy/azure')
+  @Patch('deploy')
   @ApiOperation({
-    summary: 'Deploy image to Azure cluster',
+    summary: 'Deploy image to K8s cluster',
   })
-  @ApiBody({ type: AddRepositoryToAzureClusterDto })
-  async deployToAzureCluster(
+  @ApiBody({ type: AddRepositoryToK8sClusterDto })
+  async deployToK8sCluster(
     @Request() req: RequestWithCookies,
-    @Body() request: AddRepositoryToAzureClusterDto,
+    @Body() request: AddRepositoryToK8sClusterDto,
   ) {
     const token = req.cookies?.['access_token'];
     if (token === undefined) {
@@ -327,26 +366,26 @@ export class ProjectRequestController {
 
     try {
       const response =
-        await this.clusterRequestService.DeployToAzureCluster(request);
+        await this.clusterRequestService.DeployToK8sCluster(request);
 
       if (!response) {
-        throw new Error('No response from deploying to Azure cluster');
+        throw new Error('No response from deploying to K8s cluster');
       }
 
       const result: AddRepositoryToClusterResponseAzureDto = {
         statuscode: 200,
-        message: 'Deployed to Azure cluster successfully',
+        message: 'Deployed to K8s cluster successfully',
       };
       return result;
     } catch (error) {
-      console.error('DeployToAzureCluster error:', error);
+      console.error('DeployToK8sCluster error:', error);
 
       if (error instanceof HttpException) {
         throw error;
       }
 
       throw new InternalServerErrorException(
-        error?.message ?? 'Failed to deploy to Azure cluster',
+        error?.message ?? 'Failed to deploy to K8s cluster',
       );
     }
   }

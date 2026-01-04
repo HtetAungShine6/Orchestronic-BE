@@ -63,10 +63,10 @@ model Resources {
 }
 
 model ClusterRequest {
-  id          String        @id @default(uuid())
-  ownerId     String
-  resourceId  String
-  status      Status        @default(Pending)
+  id         String @id @default(uuid())
+  ownerId    String
+  resourceId String
+  status     Status @default(Pending)
 }
 
 model ResourceConfig {

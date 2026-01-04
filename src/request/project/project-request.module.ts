@@ -40,6 +40,14 @@ import { K8sAutomationModule } from 'src/k8sautomation/k8sautomation.module';
           queue: 'resource',
         },
       },
+      {
+        name: 'RABBITMQ_SERVICE_4',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+          queue: 'destroyK8s',
+        },
+      }
     ]),
     PassportModule.register({
       defaultStrategy: 'AzureAD',

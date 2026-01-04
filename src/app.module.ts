@@ -78,6 +78,14 @@ import { K8sAutomationService } from './k8sautomation/k8sautomation.service';
           queue: 'resource',
         },
       },
+      {
+        name: 'RABBITMQ_SERVICE_4',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+          queue: 'destroyK8s',
+        },
+      }
     ]),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'swagger-static'),

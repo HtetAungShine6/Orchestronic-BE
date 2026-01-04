@@ -30,6 +30,14 @@ import { RabbitmqService } from './rabbitmq.service';
           queue: 'resource',
         },
       },
+      {
+        name: 'RABBITMQ_SERVICE_4',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+          queue: 'destroyK8s',
+        },
+      },                      
     ]),
   ],
   controllers: [RabbitmqController],
