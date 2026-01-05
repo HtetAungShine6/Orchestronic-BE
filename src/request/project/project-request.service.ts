@@ -432,7 +432,7 @@ export class ProjectRequestService {
         throw new BadRequestException('Azure K8s Cluster not found');
       }
       
-      const hashedKubeConfig = this.encryptForReceiver(
+      const hashedKubeConfig = this.encodeBase64(
         cluster.kubeConfig,
         process.env.K8S_AUTOMATION_SERVICE_PUBLIC_PEM || ''
       );
@@ -763,16 +763,12 @@ export class ProjectRequestService {
     return resourceConfig;
   }
 
-  private encryptForReceiver(kubeconfig: string, receiverPublicPem: string) {
-    const encrypted = crypto.publicEncrypt(
-      {
-        key: receiverPublicPem,
-        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: "sha256",
-      },
-      Buffer.from(kubeconfig, "utf8")
-    );
+  private encodeBase64(kubeconfig: string) {
+    const bufferObj = Buffer.from(kubeconfig, 'utf8');
 
-  return encrypted.toString("base64");
+// Encode the Buffer content to a Base64 string
+const base64String = bufferObj.toString('base64');
+
+  return base64String;
 }
 }
