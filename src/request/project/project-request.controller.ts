@@ -299,6 +299,46 @@ export class ProjectRequestController {
     }
   }
 
+  @Get('me/approved-clusters')
+  @ApiOperation({
+    summary: 'Get all approved clusters for the logged-in user',
+  })
+  async getApprovedClustersForUser(@Request() req: RequestWithCookies) {
+    const token = req.cookies?.['access_token'];
+    if (token === undefined) {
+      throw new UnauthorizedException('No access token');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as unknown;
+      const payload = decoded as BackendJwtPayload;
+      const response =
+        await this.clusterRequestService.findAllApprovedClustersByUserId(
+          payload,
+        );
+      if (!response) {
+        throw new Error('No approved clusters found for user');
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Get approved clusters for user error:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        error?.message ?? 'Failed to get approved clusters for user',
+      );
+    }
+  }
+
   @Get('me/cluster/:status')
   @ApiOperation({
     summary: 'Get clusters by user ID and status',

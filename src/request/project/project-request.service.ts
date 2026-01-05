@@ -29,6 +29,7 @@ import { UpdateClusterRequestStatusDto } from './dto/request/update-cluster.dto'
 import { AwsK8sClusterDto } from './dto/response/cluster-response-aws.dto';
 import * as crypto from 'crypto';
 import { en } from '@faker-js/faker/.';
+import cluster from 'cluster';
 
 @Injectable()
 export class ProjectRequestService {
@@ -457,19 +458,17 @@ export class ProjectRequestService {
             },
           );
 
-      if (!cluster) {
-        throw new BadRequestException('Azure K8s Cluster not found');
-      }
-      
-      if (!cluster.kubeConfig) {
-        throw new BadRequestException('Kubeconfig not found in cluster');
-      }
-      
-      const encodedKubeConfig = this.encodeBase64(
-        cluster.kubeConfig
-      );
-      // TODO: add kubeconfig to k8s automation service by cluster id
-      const kubeConfig = encodedKubeConfig;
+          if (!cluster) {
+            throw new BadRequestException('Azure K8s Cluster not found');
+          }
+
+          if (!cluster.kubeConfig) {
+            throw new BadRequestException('Kubeconfig not found in cluster');
+          }
+
+          const encodedKubeConfig = this.encodeBase64(cluster.kubeConfig);
+          // TODO: add kubeconfig to k8s automation service by cluster id
+          const kubeConfig = encodedKubeConfig;
 
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
@@ -553,9 +552,7 @@ export class ProjectRequestService {
             throw new BadRequestException('Kubeconfig not found in cluster');
           }
 
-          const encodedKubeConfig = this.encodeBase64(
-            cluster.kubeConfig
-          );
+          const encodedKubeConfig = this.encodeBase64(cluster.kubeConfig);
           // TODO: add kubeconfig to k8s automation service by cluster id
           const kubeConfig = encodedKubeConfig;
 
@@ -656,7 +653,20 @@ export class ProjectRequestService {
       },
     });
 
-    return resources;
+    return await Promise.all(
+      resources.map(async (resource) => {
+        const clusters = await this.findClusterResourceConfigById(resource.id);
+        const firstCluster = clusters?.[0];
+        return {
+          clusterRequestId: resource.id,
+          id: firstCluster?.id || '',
+          name: firstCluster?.clusterName || '',
+          region: resource.region,
+          resourceConfigId: resource.resourceConfigId,
+          cloudProvider: resource.cloudProvider,
+        };
+      }),
+    );
   }
 
   async findClustersByUserIdAndStatus(req: BackendJwtPayload, status: Status) {
@@ -714,10 +724,52 @@ export class ProjectRequestService {
       },
     });
 
-    return clusterRequests.map((cr) => ({
-      clusterRequestId: cr.id,
-      ...resources.find((r) => r.id === cr.resourceId),
-    }));
+    return await Promise.all(
+      resources.map(async (resource) => {
+        const clusters = await this.findClusterResourceConfigById(resource.id);
+        const firstCluster = clusters?.[0];
+        return {
+          clusterRequestId: resource.id,
+          id: firstCluster?.id || '',
+          name: firstCluster?.clusterName || '',
+          region: resource.region,
+          resourceConfigId: resource.resourceConfigId,
+          cloudProvider: resource.cloudProvider,
+        };
+      }),
+    );
+  }
+
+  async findAllApprovedClustersByUserId(req: BackendJwtPayload) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        ownerId: req.id,
+        status: Status.Approved,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return await Promise.all(
+      resources.map(async (resource) => {
+        const clusters = await this.findClusterResourceConfigById(resource.id);
+        const firstCluster = clusters?.[0];
+        return {
+          clusterRequestId: resource.id,
+          id: firstCluster?.id || '',
+          name: firstCluster?.clusterName || '',
+          region: resource.region,
+          resourceConfigId: resource.resourceConfigId,
+          cloudProvider: resource.cloudProvider,
+        };
+      }),
+    );
   }
 
   async findAllClustersWithStatus(status: Status) {
