@@ -6,6 +6,11 @@ export class CreateClusterDeploymentRequestDto {
         example: 'image-name',
     })
     name: string;
+
+    @ApiProperty({
+        example: 'app1.cluster1.edge-public-ip.nip.io',
+    })
+    host: string;
     
     @ApiProperty({
         example: 'repository/image:tag',
