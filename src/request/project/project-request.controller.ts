@@ -504,4 +504,14 @@ export class ProjectRequestController {
 
     return response;
   }
+  
+  @Get('/deployments/:repositoryId')
+  async getImageDeploymentsByRepoId(@Param('repositoryId') repositoryId: string) {
+    const response =
+      await this.clusterRequestService.findImageDeploymentsByRepoId(repositoryId);
+    if (!response) {
+      throw new Error('No image deployments found for the specified repository');
+    }
+    return response;
+  }
 }

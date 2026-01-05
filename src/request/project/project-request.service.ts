@@ -887,6 +887,18 @@ export class ProjectRequestService {
     return resourceConfig;
   }
 
+  async   findImageDeploymentsByRepoId(repositoryId: string) {
+    const imageDeployments =
+      await this.databaseService.imageDeployment.findMany({
+        where: { repositoryId: repositoryId },
+      });
+
+    if (!imageDeployments || imageDeployments.length === 0) {
+      throw new BadRequestException('No image deployments found');
+    }
+    return imageDeployments;
+  }
+
   private encodeBase64(kubeconfig: string) {
     const bufferObj = Buffer.from(kubeconfig, 'utf8');
 
