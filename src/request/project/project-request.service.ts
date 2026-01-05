@@ -526,6 +526,7 @@ export class ProjectRequestService {
             data: {
               repositoryId: request.repositoryId,
               AzureK8sClusterId: cluster.id,
+              hostedUrl: host,
               imageUrl: projectDetail.image, // Add the appropriate image URL
               DeploymentStatus: deployStatus.Deployed,
             },
@@ -612,6 +613,7 @@ export class ProjectRequestService {
             data: {
               repositoryId: request.repositoryId,
               AwsK8sClusterId: cluster.id,
+              hostedUrl: host,
               imageUrl: projectDetail.image, // Add the appropriate image URL
               DeploymentStatus: deployStatus.Deployed,
             },

@@ -45,6 +45,7 @@ model ImageDeployment {
   AwsK8sClusterId   String?
   AzureK8sClusterId String?
   imageUrl          String
+  hostedUrl         String           @default("")
   DeploymentStatus  String           @default("Pending")
   awsK8sCluster     AwsK8sCluster?   @relation(fields: [AwsK8sClusterId], references: [id])
   azureK8sCluster   AzureK8sCluster? @relation(fields: [AzureK8sClusterId], references: [id])
