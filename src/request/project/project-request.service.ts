@@ -432,14 +432,15 @@ export class ProjectRequestService {
         throw new BadRequestException('Azure K8s Cluster not found');
       }
       
+      if (!cluster.kubeConfig) {
+        throw new BadRequestException('Kubeconfig not found in cluster');
+      }
+      
       const hashedKubeConfig = this.encodeBase64(
         cluster.kubeConfig
       );
       // TODO: add kubeconfig to k8s automation service by cluster id
       const kubeConfig = hashedKubeConfig;
-      if (!kubeConfig) {
-        throw new BadRequestException('Kubeconfig not found in cluster');
-      }
 
       // Deploy into cluster
       const deploymentRequest = new CreateClusterDeploymentRequestDto();
