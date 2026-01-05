@@ -465,11 +465,11 @@ export class ProjectRequestService {
         throw new BadRequestException('Kubeconfig not found in cluster');
       }
       
-      const hashedKubeConfig = this.encodeBase64(
+      const encodedKubeConfig = this.encodeBase64(
         cluster.kubeConfig
       );
       // TODO: add kubeconfig to k8s automation service by cluster id
-      const kubeConfig = hashedKubeConfig;
+      const kubeConfig = encodedKubeConfig;
 
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
@@ -553,11 +553,11 @@ export class ProjectRequestService {
             throw new BadRequestException('Kubeconfig not found in cluster');
           }
 
-          const hashedKubeConfig = this.encodeBase64(
+          const encodedKubeConfig = this.encodeBase64(
             cluster.kubeConfig
           );
           // TODO: add kubeconfig to k8s automation service by cluster id
-          const kubeConfig = hashedKubeConfig;
+          const kubeConfig = encodedKubeConfig;
 
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
