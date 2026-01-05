@@ -11,7 +11,12 @@ import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
 import { CreateClusterRequestDto } from './dto/request/create-cluster-request.dto';
 import { ApiBody } from '@nestjs/swagger';
-import { AwsK8sCluster, CloudProvider, deployStatus, Status } from '@prisma/client';
+import {
+  AwsK8sCluster,
+  CloudProvider,
+  deployStatus,
+  Status,
+} from '@prisma/client';
 import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
 import { AddRepositoryToK8sClusterDto } from './dto/request/update-repository.dto';
 import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
@@ -136,7 +141,10 @@ export class ProjectRequestService {
   // }
 
   @ApiBody({ type: CreateClusterRequestDto })
-  async createCluster(user: BackendJwtPayload, request: CreateClusterRequestDto) {
+  async createCluster(
+    user: BackendJwtPayload,
+    request: CreateClusterRequestDto,
+  ) {
     const ownerId = user.id;
     const resources = request.resources;
     const provider = (
@@ -151,7 +159,7 @@ export class ProjectRequestService {
       throw new BadRequestException('Authenticated user not found in database');
     }
 
-    if(provider == CloudProvider.AZURE) {
+    if (provider == CloudProvider.AZURE) {
       const resourceConfig = await this.databaseService.resourceConfig.create({
         data: {
           AzureK8sCluster: {
@@ -177,7 +185,7 @@ export class ProjectRequestService {
       });
     }
 
-    if(provider == CloudProvider.AWS) {
+    if (provider == CloudProvider.AWS) {
       const resourceConfig = await this.databaseService.resourceConfig.create({
         data: {
           AwsK8sCluster: {
@@ -202,8 +210,6 @@ export class ProjectRequestService {
         },
       });
     }
-
-    
 
     // const updatedClusterRequest = await this.databaseService.request.update({
     //   where: { id: request.requestId },
@@ -258,7 +264,9 @@ export class ProjectRequestService {
     });
 
     if (!resource) {
-      throw new BadRequestException('Resource not found for the cluster request');
+      throw new BadRequestException(
+        'Resource not found for the cluster request',
+      );
     }
 
     // update status first
@@ -267,14 +275,20 @@ export class ProjectRequestService {
       data: { status: updateClusterDto.status },
     });
 
-    if (updateClusterDto.status === Status.Approved && resource.cloudProvider === CloudProvider.AZURE) {
+    if (
+      updateClusterDto.status === Status.Approved &&
+      resource.cloudProvider === CloudProvider.AZURE
+    ) {
       await Promise.all([
         this.rabbitmqService.queueResource(clusterRequest.resourceId),
         this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
       ]);
     }
 
-    if (updateClusterDto.status === Status.Approved && resource.cloudProvider === CloudProvider.AWS) {
+    if (
+      updateClusterDto.status === Status.Approved &&
+      resource.cloudProvider === CloudProvider.AWS
+    ) {
       await Promise.all([
         this.rabbitmqService.queueResource(clusterRequest.resourceId),
         this.airflowService.triggerDag(user, 'AWS_Resources_Cluster'),
@@ -395,41 +409,61 @@ export class ProjectRequestService {
   }
 
   async DeployToK8sCluster(request: AddRepositoryToK8sClusterDto) {
-    // Check if repository exists
-    const repository = await this.databaseService.repository.findUnique({
-      where: { id: request.repositoryId },
-    });
-
-    if (!repository) {
-      throw new BadRequestException('Repository not found');
-    }
-
-    // Get image from gitlab
-    const project = await this.gitlabService.getProjectByName(repository.name);
-    if (!project) {
-      throw new BadRequestException('Project not found in GitLab');
-    }
-    let projectDetail;
     try {
-      projectDetail = await this.gitlabService.getImageFromRegistry(project.id);
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to get image from GitLab registry: ${error.message}`,
+      console.log(
+        'DeployToK8sCluster called with request:',
+        JSON.stringify(request, null, 2),
       );
-    }
 
-    if (!projectDetail || !projectDetail.name || !projectDetail.image) {
-      throw new BadRequestException('No image found in GitLab registry');
-    }
-
-    // Get chosen cluster
-    if(request.provider === CloudProvider.AZURE) {
-      const cluster = await this.databaseService.azureK8sCluster.findUnique({
-        where: { id: request.clusterId },
+      // Check if repository exists
+      const repository = await this.databaseService.repository.findUnique({
+        where: { id: request.repositoryId },
       });
+
+      console.log('Repository found:', repository ? repository.id : 'null');
+
+      if (!repository) {
+        throw new BadRequestException('Repository not found');
+      }
+
+      // Get image from gitlab
+      const project = await this.gitlabService.getProjectByName(
+        repository.name,
+      );
+      if (!project) {
+        throw new BadRequestException('Project not found in GitLab');
+      }
+      let projectDetail;
+      try {
+        projectDetail = await this.gitlabService.getImageFromRegistry(
+          project.id,
+        );
+      } catch (error) {
+        console.error('Error getting image from GitLab registry:', error);
+        throw new BadRequestException(
+          `Failed to get image from GitLab registry: ${error.message}`,
+        );
+      }
+
+      if (!projectDetail || !projectDetail.name || !projectDetail.image) {
+        throw new BadRequestException('No image found in GitLab registry');
+      }
+
+      // Get chosen cluster
+      if (request.provider === CloudProvider.AZURE) {
+        try {
+          const cluster = await this.databaseService.azureK8sCluster.findUnique(
+            {
+              where: { id: request.clusterId },
+            },
+          );
 
       if (!cluster) {
         throw new BadRequestException('Azure K8s Cluster not found');
+      }
+      
+      if (!cluster.kubeConfig) {
+        throw new BadRequestException('Kubeconfig not found in cluster');
       }
       
       const hashedKubeConfig = this.encodeBase64(
@@ -437,134 +471,169 @@ export class ProjectRequestService {
       );
       // TODO: add kubeconfig to k8s automation service by cluster id
       const kubeConfig = hashedKubeConfig;
-      if (!kubeConfig) {
-        throw new BadRequestException('Kubeconfig not found in cluster');
+
+          // Deploy into cluster
+          const deploymentRequest = new CreateClusterDeploymentRequestDto();
+          deploymentRequest.name = projectDetail.name;
+          deploymentRequest.host = request.host;
+          deploymentRequest.image = projectDetail.image;
+          deploymentRequest.port = request.port;
+          deploymentRequest.usePrivateRegistry =
+            request.usePrivateRegistry ?? false;
+          deploymentRequest.kubeConfig = kubeConfig;
+
+          console.log('Deployment Request:', deploymentRequest);
+          const deploymentResponse =
+            await this.k8sAutomationService.automateK8sDeployment(
+              deploymentRequest,
+            );
+          if (!deploymentResponse || !deploymentResponse.success) {
+            console.error(
+              'Azure deployment failed:',
+              deploymentResponse?.message,
+            );
+            throw new BadRequestException(
+              'Failed to deploy to Azure K8s Cluster',
+            );
+          }
+
+          // Add resource to repository
+          const resourceConfig =
+            await this.databaseService.resourceConfig.findUnique({
+              where: { id: cluster.resourceConfigId },
+            });
+          if (!resourceConfig) {
+            throw new BadRequestException('Resource config not found');
+          }
+
+          const resource = await this.databaseService.resources.findFirst({
+            where: { resourceConfigId: resourceConfig.id },
+          });
+          if (!resource) {
+            throw new BadRequestException('Resource not found');
+          }
+
+          // Add repository to cluster
+          const response = await this.databaseService.repository.update({
+            where: { id: request.repositoryId },
+            data: {
+              resourcesId: resource.id,
+            },
+          });
+
+          await this.databaseService.imageDeployment.create({
+            data: {
+              repositoryId: request.repositoryId,
+              AzureK8sClusterId: cluster.id,
+              imageUrl: projectDetail.image, // Add the appropriate image URL
+              DeploymentStatus: deployStatus.Deployed,
+            },
+          });
+
+          return response;
+        } catch (error) {
+          console.error('Error deploying to Azure K8s Cluster:', error);
+          console.error('Error stack:', error.stack);
+          throw new BadRequestException(
+            `Failed to deploy to Azure K8s Cluster: ${error.message}`,
+          );
+        }
       }
 
-      // Deploy into cluster
-      const deploymentRequest = new CreateClusterDeploymentRequestDto();
-      deploymentRequest.name = projectDetail.name;
-      deploymentRequest.image = projectDetail.image;
-      deploymentRequest.port = request.port;
-      deploymentRequest.usePrivateRegistry =
-        request.usePrivateRegistry ?? false;
-      deploymentRequest.kubeConfig = kubeConfig;
+      if (request.provider === CloudProvider.AWS) {
+        try {
+          console.log('Deploying to AWS K8s Cluster', request.clusterId);
+          const cluster = await this.databaseService.awsK8sCluster.findUnique({
+            where: { id: request.clusterId },
+          });
 
-      console.log('Deployment Request:', deploymentRequest);
-      const deploymentResponse =
-        await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
-      if (!deploymentResponse || !deploymentResponse.success) {
-        throw new BadRequestException('Failed to deploy to Azure K8s Cluster');
+          if (!cluster) {
+            throw new BadRequestException('AWS K8s Cluster not found');
+          }
+
+          // TODO: add kubeconfig to k8s automation service by cluster id
+          const kubeConfig = cluster.kubeConfig;
+          if (!kubeConfig) {
+            throw new BadRequestException('Kubeconfig not found in cluster');
+          }
+
+          // Deploy into cluster
+          const deploymentRequest = new CreateClusterDeploymentRequestDto();
+          deploymentRequest.name = projectDetail.name;
+          deploymentRequest.image = projectDetail.image;
+          deploymentRequest.port = request.port;
+          deploymentRequest.usePrivateRegistry =
+            request.usePrivateRegistry ?? false;
+          deploymentRequest.kubeConfig = kubeConfig;
+
+          console.log('Deployment Request:', deploymentRequest);
+          const deploymentResponse =
+            await this.k8sAutomationService.automateK8sDeployment(
+              deploymentRequest,
+            );
+          if (!deploymentResponse || !deploymentResponse.success) {
+            console.error(
+              'AWS deployment failed:',
+              deploymentResponse?.message,
+            );
+            throw new BadRequestException(
+              'Failed to deploy to AWS K8s Cluster',
+            );
+          }
+
+          // Add resource to repository
+          const resourceConfig =
+            await this.databaseService.resourceConfig.findUnique({
+              where: { id: cluster.resourceConfigId },
+            });
+          if (!resourceConfig) {
+            throw new BadRequestException('Resource config not found');
+          }
+
+          const resource = await this.databaseService.resources.findFirst({
+            where: { resourceConfigId: resourceConfig.id },
+          });
+          if (!resource) {
+            throw new BadRequestException('Resource not found');
+          }
+
+          // Add repository to cluster
+          const response = await this.databaseService.repository.update({
+            where: { id: request.repositoryId },
+            data: {
+              resourcesId: resource.id,
+            },
+          });
+
+          await this.databaseService.imageDeployment.create({
+            data: {
+              repositoryId: request.repositoryId,
+              AwsK8sClusterId: cluster.id,
+              imageUrl: projectDetail.image, // Add the appropriate image URL
+              DeploymentStatus: deployStatus.Deployed,
+            },
+          });
+
+          return response;
+        } catch (error) {
+          console.error('Error deploying to AWS K8s Cluster:', error);
+          console.error('Error stack:', error.stack);
+          throw new BadRequestException(
+            `Failed to deploy to AWS K8s Cluster: ${error.message}`,
+          );
+        }
       }
-
-      // Add resource to repository
-      const resourceConfig = await this.databaseService.resourceConfig.findUnique(
-        {
-          where: { id: cluster.resourceConfigId },
-        },
+    } catch (error) {
+      console.error('=== DeployToK8sCluster Error ===');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error(
+        'Full error:',
+        JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
       );
-      if (!resourceConfig) {
-        throw new BadRequestException('Resource config not found');
-      }
-
-      const resource = await this.databaseService.resources.findFirst({
-        where: { resourceConfigId: resourceConfig.id },
-      });
-      if (!resource) {
-        throw new BadRequestException('Resource not found');
-      }
-
-      // Add repository to cluster
-      const response = await this.databaseService.repository.update({
-        where: { id: request.repositoryId },
-        data: {
-          resourcesId: resource.id,
-        },
-      });
-
-      await this.databaseService.imageDeployment.create({
-        data: {
-          repositoryId: request.repositoryId,
-          AzureK8sClusterId: cluster.id,
-          imageUrl: projectDetail.image, // Add the appropriate image URL
-          DeploymentStatus: deployStatus.Deployed,
-        },
-      });
-
-      return response;
+      console.error('================================');
+      throw error;
     }
-
-    if(request.provider === CloudProvider.AWS) {
-      console.log('Deploying to AWS K8s Cluster', request.clusterId);
-      const cluster = await this.databaseService.awsK8sCluster.findUnique({
-        where: { id: request.clusterId },
-      });
-
-      if (!cluster) {
-        throw new BadRequestException('AWS K8s Cluster not found');
-      }
-
-      // TODO: add kubeconfig to k8s automation service by cluster id
-      const kubeConfig = cluster.kubeConfig;
-      if (!kubeConfig) {
-        throw new BadRequestException('Kubeconfig not found in cluster');
-      }
-
-      // Deploy into cluster
-      const deploymentRequest = new CreateClusterDeploymentRequestDto();
-      deploymentRequest.name = projectDetail.name;
-      deploymentRequest.image = projectDetail.image;
-      deploymentRequest.port = request.port;
-      deploymentRequest.usePrivateRegistry =
-        request.usePrivateRegistry ?? false;
-      deploymentRequest.kubeConfig = kubeConfig;
-
-      console.log('Deployment Request:', deploymentRequest);
-      const deploymentResponse =
-        await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
-      if (!deploymentResponse || !deploymentResponse.success) {
-        console.log('Deployment Response:', deploymentResponse.message);
-        throw new BadRequestException('Failed to deploy to AWS K8s Cluster');
-      }
-
-      // Add resource to repository
-      const resourceConfig = await this.databaseService.resourceConfig.findUnique(
-        {
-          where: { id: cluster.resourceConfigId },
-        },
-      );
-      if (!resourceConfig) {
-        throw new BadRequestException('Resource config not found');
-      }
-
-      const resource = await this.databaseService.resources.findFirst({
-        where: { resourceConfigId: resourceConfig.id },
-      });
-      if (!resource) {
-        throw new BadRequestException('Resource not found');
-      }
-
-      // Add repository to cluster
-      const response = await this.databaseService.repository.update({
-        where: { id: request.repositoryId },
-        data: {
-          resourcesId: resource.id,
-        },
-      });
-
-      await this.databaseService.imageDeployment.create({
-        data: {
-          repositoryId: request.repositoryId,
-          AwsK8sClusterId: cluster.id,
-          imageUrl: projectDetail.image, // Add the appropriate image URL
-          DeploymentStatus: deployStatus.Deployed,
-        },
-      });
-
-      return response;
-    }
-
-    
   }
 
   async updateDeployToAzureCluster() {}
@@ -686,12 +755,11 @@ export class ProjectRequestService {
       where: { id: clusterId },
     });
 
-    if(resource?.cloudProvider === CloudProvider.AWS) {
-      const resourceConfig = await this.databaseService.resourceConfig.findUnique(
-        {
+    if (resource?.cloudProvider === CloudProvider.AWS) {
+      const resourceConfig =
+        await this.databaseService.resourceConfig.findUnique({
           where: { id: resource?.resourceConfigId },
-        },
-      );
+        });
 
       const cluster = await this.databaseService.awsK8sCluster.findMany({
         where: { resourceConfigId: resourceConfig?.id },
@@ -704,12 +772,11 @@ export class ProjectRequestService {
       return cluster;
     }
 
-    if(resource?.cloudProvider === CloudProvider.AZURE) {
-      const resourceConfig = await this.databaseService.resourceConfig.findUnique(
-        {
+    if (resource?.cloudProvider === CloudProvider.AZURE) {
+      const resourceConfig =
+        await this.databaseService.resourceConfig.findUnique({
           where: { id: resource?.resourceConfigId },
-        },
-      );
+        });
 
       const cluster = await this.databaseService.azureK8sCluster.findMany({
         where: { resourceConfigId: resourceConfig?.id },
@@ -749,11 +816,9 @@ export class ProjectRequestService {
   }
 
   async findResourceConfigById(resourceConfigId: string) {
-    const resourceConfig = await this.databaseService.resourceConfig.findMany(
-      {
-        where: { id: resourceConfigId },
-      },
-    );
+    const resourceConfig = await this.databaseService.resourceConfig.findMany({
+      where: { id: resourceConfigId },
+    });
 
     if (!resourceConfig) {
       throw new BadRequestException('Resource config not found');

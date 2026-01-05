@@ -246,11 +246,9 @@ export class ProjectRequestController {
     }
   }
 
-
-
-  @Get('cluster/:clusterid')
-  async getAzureClusterRequestById(@Param('clusterid') clusterid: string) {
-    return this.clusterRequestService.findClusterRequestsByReqId(clusterid);
+  @Get('cluster/:clusterRequestId')
+  async getAzureClusterRequestById(@Param('clusterRequestId') clusterRequestId: string) {
+    return this.clusterRequestService.findClusterRequestsByReqId(clusterRequestId);
   }
 
   @Get('clusters')
@@ -336,7 +334,7 @@ export class ProjectRequestController {
       console.error('Get Cluster by user id error:', error);
 
       if (error instanceof HttpException) {
-        throw error; 
+        throw error;
       }
 
       throw new InternalServerErrorException(
@@ -365,6 +363,10 @@ export class ProjectRequestController {
     }
 
     try {
+      console.log(
+        '[Controller] Starting DeployToK8sCluster with request:',
+        request,
+      );
       const response =
         await this.clusterRequestService.DeployToK8sCluster(request);
 
@@ -378,7 +380,12 @@ export class ProjectRequestController {
       };
       return result;
     } catch (error) {
-      console.error('DeployToK8sCluster error:', error);
+      console.error('=== Controller DeployToK8sCluster Error ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('Full error:', error);
+      console.error('==========================================');
 
       if (error instanceof HttpException) {
         throw error;
@@ -416,14 +423,13 @@ export class ProjectRequestController {
     return response;
   }
 
-
-  @Get('/resources/:clusterId')
+  @Get('/resources/:clusterRequestId')
   @ApiOperation({
     summary: 'Get resources by cluster ID',
   })
-  async getClusterResourcesById(@Param('clusterId') clusterId: string) {
+  async getClusterResourcesById(@Param('clusterRequestId') clusterRequestId: string) {
     const response =
-      await this.clusterRequestService.findClusterResourcesById(clusterId);
+      await this.clusterRequestService.findClusterResourcesById(clusterRequestId);
     if (!response) {
       throw new Error('No resources found for cluster');
     }
@@ -431,13 +437,13 @@ export class ProjectRequestController {
     return response;
   }
 
-  @Get('/resource-config/:clusterId')
+  @Get('/resource-config/:clusterRequestId')
   @ApiOperation({
     summary: 'Get resource config by cluster ID',
   })
-  async getClusterResourceConfigById(@Param('clusterId') clusterId: string) {
+  async getClusterResourceConfigById(@Param('clusterRequestId') clusterRequestId: string) {
     const response =
-      await this.clusterRequestService.findClusterResourceConfigById(clusterId);
+      await this.clusterRequestService.findClusterResourceConfigById(clusterRequestId);
     if (!response) {
       throw new Error('No resource config found for cluster');
     }
