@@ -246,9 +246,9 @@ export class ProjectRequestController {
     }
   }
 
-  @Get('cluster/:clusterid')
-  async getAzureClusterRequestById(@Param('clusterid') clusterid: string) {
-    return this.clusterRequestService.findClusterRequestsByReqId(clusterid);
+  @Get('cluster/:clusterRequestId')
+  async getAzureClusterRequestById(@Param('clusterRequestId') clusterRequestId: string) {
+    return this.clusterRequestService.findClusterRequestsByReqId(clusterRequestId);
   }
 
   @Get('clusters')
@@ -423,13 +423,13 @@ export class ProjectRequestController {
     return response;
   }
 
-  @Get('/resources/:clusterId')
+  @Get('/resources/:clusterRequestId')
   @ApiOperation({
     summary: 'Get resources by cluster ID',
   })
-  async getClusterResourcesById(@Param('clusterId') clusterId: string) {
+  async getClusterResourcesById(@Param('clusterRequestId') clusterRequestId: string) {
     const response =
-      await this.clusterRequestService.findClusterResourcesById(clusterId);
+      await this.clusterRequestService.findClusterResourcesById(clusterRequestId);
     if (!response) {
       throw new Error('No resources found for cluster');
     }
@@ -437,13 +437,13 @@ export class ProjectRequestController {
     return response;
   }
 
-  @Get('/resource-config/:clusterId')
+  @Get('/resource-config/:clusterRequestId')
   @ApiOperation({
     summary: 'Get resource config by cluster ID',
   })
-  async getClusterResourceConfigById(@Param('clusterId') clusterId: string) {
+  async getClusterResourceConfigById(@Param('clusterRequestId') clusterRequestId: string) {
     const response =
-      await this.clusterRequestService.findClusterResourceConfigById(clusterId);
+      await this.clusterRequestService.findClusterResourceConfigById(clusterRequestId);
     if (!response) {
       throw new Error('No resource config found for cluster');
     }
