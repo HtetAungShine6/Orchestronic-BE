@@ -22,6 +22,8 @@ import { UserClustersPayloadDto } from './dto/response/get-cluster-by-user-id-re
 import { CreateClusterAzureResponseDto } from './dto/response/create-cluster-azure-response.dto';
 import { UpdateClusterRequestStatusDto } from './dto/request/update-cluster.dto';
 import { AwsK8sClusterDto } from './dto/response/cluster-response-aws.dto';
+import * as crypto from 'crypto';
+import { en } from '@faker-js/faker/.';
 
 @Injectable()
 export class ProjectRequestService {
@@ -429,9 +431,13 @@ export class ProjectRequestService {
       if (!cluster) {
         throw new BadRequestException('Azure K8s Cluster not found');
       }
-
+      
+      const hashedKubeConfig = this.encryptForReceiver(
+        cluster.kubeConfig,
+        process.env.K8S_AUTOMATION_SERVICE_PUBLIC_PEM || ''
+      );
       // TODO: add kubeconfig to k8s automation service by cluster id
-      const kubeConfig = cluster.kubeConfig;
+      const kubeConfig = hashedKubeConfig;
       if (!kubeConfig) {
         throw new BadRequestException('Kubeconfig not found in cluster');
       }
@@ -756,4 +762,17 @@ export class ProjectRequestService {
 
     return resourceConfig;
   }
+
+  private encryptForReceiver(kubeconfig: string, receiverPublicPem: string) {
+    const encrypted = crypto.publicEncrypt(
+      {
+        key: receiverPublicPem,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: "sha256",
+      },
+      Buffer.from(kubeconfig, "utf8")
+    );
+
+  return encrypted.toString("base64");
+}
 }
