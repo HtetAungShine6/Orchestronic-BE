@@ -474,7 +474,7 @@ export class ProjectRequestService {
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
-          deploymentRequest.host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
+          deploymentRequest.host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
           deploymentRequest.usePrivateRegistry =
@@ -562,7 +562,7 @@ export class ProjectRequestService {
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
-          deploymentRequest.host = `${repository.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
+          deploymentRequest.host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
           deploymentRequest.usePrivateRegistry =
