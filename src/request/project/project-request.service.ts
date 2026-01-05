@@ -433,8 +433,7 @@ export class ProjectRequestService {
       }
       
       const hashedKubeConfig = this.encodeBase64(
-        cluster.kubeConfig,
-        process.env.K8S_AUTOMATION_SERVICE_PUBLIC_PEM || ''
+        cluster.kubeConfig
       );
       // TODO: add kubeconfig to k8s automation service by cluster id
       const kubeConfig = hashedKubeConfig;
@@ -766,9 +765,9 @@ export class ProjectRequestService {
   private encodeBase64(kubeconfig: string) {
     const bufferObj = Buffer.from(kubeconfig, 'utf8');
 
-// Encode the Buffer content to a Base64 string
-const base64String = bufferObj.toString('base64');
+    // Encode the Buffer content to a Base64 string
+    const base64String = bufferObj.toString('base64');
 
-  return base64String;
-}
+    return base64String;
+  }
 }
