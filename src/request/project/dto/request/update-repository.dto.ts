@@ -21,12 +21,6 @@ export class AddRepositoryToK8sClusterDto {
   })
   repositoryId: string;
 
-  @IsString()
-  @ApiProperty({
-    example: 'app1.cluster1.edge-public-ip.nip.io',
-  })
-  host: string;
-
   @IsNumber()
   @ApiProperty({
     example: 80,

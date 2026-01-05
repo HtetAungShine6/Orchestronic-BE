@@ -420,8 +420,6 @@ export class ProjectRequestService {
         where: { id: request.repositoryId },
       });
 
-      console.log('Repository found:', repository ? repository.id : 'null');
-
       if (!repository) {
         throw new BadRequestException('Repository not found');
       }
@@ -433,6 +431,7 @@ export class ProjectRequestService {
       if (!project) {
         throw new BadRequestException('Project not found in GitLab');
       }
+
       let projectDetail;
       try {
         projectDetail = await this.gitlabService.getImageFromRegistry(
@@ -475,7 +474,7 @@ export class ProjectRequestService {
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
-          deploymentRequest.host = request.host;
+          deploymentRequest.host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
           deploymentRequest.usePrivateRegistry =
@@ -550,16 +549,20 @@ export class ProjectRequestService {
           if (!cluster) {
             throw new BadRequestException('AWS K8s Cluster not found');
           }
-
-          // TODO: add kubeconfig to k8s automation service by cluster id
-          const kubeConfig = cluster.kubeConfig;
-          if (!kubeConfig) {
+          if (!cluster.kubeConfig) {
             throw new BadRequestException('Kubeconfig not found in cluster');
           }
+
+          const hashedKubeConfig = this.encodeBase64(
+            cluster.kubeConfig
+          );
+          // TODO: add kubeconfig to k8s automation service by cluster id
+          const kubeConfig = hashedKubeConfig;
 
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
+          deploymentRequest.host = `${repository.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
           deploymentRequest.usePrivateRegistry =
