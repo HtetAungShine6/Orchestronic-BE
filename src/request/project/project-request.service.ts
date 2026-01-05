@@ -475,7 +475,7 @@ export class ProjectRequestService {
       host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
-          deploymentRequest.name = projectDetail.name;
+          deploymentRequest.name = repository.name;
           deploymentRequest.host = host;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
@@ -561,7 +561,7 @@ export class ProjectRequestService {
           host = `${repository.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
-          deploymentRequest.name = projectDetail.name;
+          deploymentRequest.name = repository.name;
           deploymentRequest.host = host;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
