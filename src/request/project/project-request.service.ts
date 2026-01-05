@@ -471,7 +471,7 @@ export class ProjectRequestService {
       );
       // TODO: add kubeconfig to k8s automation service by cluster id
       const kubeConfig = encodedKubeConfig;
-      host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
+      host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
@@ -559,7 +559,7 @@ export class ProjectRequestService {
           );
           // TODO: add kubeconfig to k8s automation service by cluster id
           const kubeConfig = encodedKubeConfig;
-          host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
+          host = `${repository.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
