@@ -571,19 +571,19 @@ export class ProjectRequestService {
           deploymentRequest.kubeConfig = kubeConfig;
 
           console.log('Deployment Request:', deploymentRequest);
-          const deploymentResponse =
-            await this.k8sAutomationService.automateK8sDeployment(
-              deploymentRequest,
-            );
-          if (!deploymentResponse || !deploymentResponse.success) {
-            console.error(
-              'AWS deployment failed:',
-              deploymentResponse?.message,
-            );
-            throw new BadRequestException(
-              'Failed to deploy to AWS K8s Cluster',
-            );
-          }
+          // const deploymentResponse =
+          //   await this.k8sAutomationService.automateK8sDeployment(
+          //     deploymentRequest,
+          //   );
+          // if (!deploymentResponse || !deploymentResponse.success) {
+          //   console.error(
+          //     'AWS deployment failed:',
+          //     deploymentResponse?.message,
+          //   );
+          //   throw new BadRequestException(
+          //     'Failed to deploy to AWS K8s Cluster',
+          //   );
+          // }
 
           // Add resource to repository
           const resourceConfig =
@@ -602,12 +602,12 @@ export class ProjectRequestService {
           }
 
           // Add repository to cluster
-          const response = await this.databaseService.repository.update({
-            where: { id: request.repositoryId },
-            data: {
-              resourcesId: resource.id,
-            },
-          });
+          // await this.databaseService.repository.update({
+          //   where: { id: request.repositoryId },
+          //   data: {
+          //     resourcesId: resource.id,
+          //   },
+          // });
 
           await this.databaseService.imageDeployment.create({
             data: {
@@ -889,13 +889,13 @@ export class ProjectRequestService {
 
   async   findImageDeploymentsByRepoId(repositoryId: string) {
     const imageDeployments =
-      await this.databaseService.imageDeployment.findMany({
+      await this.databaseService.imageDeployment.findFirst({
         where: { repositoryId: repositoryId },
       });
 
-    if (!imageDeployments || imageDeployments.length === 0) {
-      throw new BadRequestException('No image deployments found');
-    }
+    // if (!imageDeployments || imageDeployments.length === 0) {
+    //   throw new BadRequestException('No image deployments found');
+    // }
     return imageDeployments;
   }
 
