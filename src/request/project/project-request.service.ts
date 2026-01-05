@@ -448,6 +448,7 @@ export class ProjectRequestService {
         throw new BadRequestException('No image found in GitLab registry');
       }
 
+      let host = '';
       // Get chosen cluster
       if (request.provider === CloudProvider.AZURE) {
         try {
@@ -470,11 +471,11 @@ export class ProjectRequestService {
       );
       // TODO: add kubeconfig to k8s automation service by cluster id
       const kubeConfig = encodedKubeConfig;
-
+      host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
-          deploymentRequest.host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
+          deploymentRequest.host = host;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
           deploymentRequest.usePrivateRegistry =
@@ -558,11 +559,11 @@ export class ProjectRequestService {
           );
           // TODO: add kubeconfig to k8s automation service by cluster id
           const kubeConfig = encodedKubeConfig;
-
+          host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = projectDetail.name;
-          deploymentRequest.host = `${projectDetail.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
+          deploymentRequest.host = host;
           deploymentRequest.image = projectDetail.image;
           deploymentRequest.port = request.port;
           deploymentRequest.usePrivateRegistry =
@@ -617,7 +618,7 @@ export class ProjectRequestService {
             },
           });
 
-          return response;
+          return host;
         } catch (error) {
           console.error('Error deploying to AWS K8s Cluster:', error);
           console.error('Error stack:', error.stack);
