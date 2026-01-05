@@ -416,7 +416,7 @@ export class ProjectRequestController {
 
       const result: AddRepositoryToClusterResponseAzureDto = {
         statuscode: 200,
-        message: 'Deployed to K8s cluster successfully',
+        message: `Deployed to K8s cluster successfully => ${response}`,
       };
       return result;
     } catch (error) {
