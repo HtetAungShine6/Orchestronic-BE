@@ -557,9 +557,18 @@ export class ProjectRequestService {
           }
 
           const encodedKubeConfig = this.encodeBase64(cluster.kubeConfig);
+          const clusterEndpoint = cluster.clusterEndpoint;
+          if(!clusterEndpoint) {
+            throw new BadRequestException('Cluster endpoint not found in cluster');
+          }
+          const parsedEndpoint = JSON.parse(clusterEndpoint);
+
+          if(!parsedEndpoint.edge_public_ip) {
+            throw new BadRequestException('Edge public IP not found in cluster endpoint');
+          }
           // TODO: add kubeconfig to k8s automation service by cluster id
           const kubeConfig = encodedKubeConfig;
-          host = `${repository.name}.${cluster.clusterName}.${cluster.clusterEndpoint}.nip.io`;
+          host = `${repository.name}.${cluster.clusterName}.${parsedEndpoint.edge_public_ip}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = repository.name;
@@ -571,19 +580,19 @@ export class ProjectRequestService {
           deploymentRequest.kubeConfig = kubeConfig;
 
           console.log('Deployment Request:', deploymentRequest);
-          // const deploymentResponse =
-          //   await this.k8sAutomationService.automateK8sDeployment(
-          //     deploymentRequest,
-          //   );
-          // if (!deploymentResponse || !deploymentResponse.success) {
-          //   console.error(
-          //     'AWS deployment failed:',
-          //     deploymentResponse?.message,
-          //   );
-          //   throw new BadRequestException(
-          //     'Failed to deploy to AWS K8s Cluster',
-          //   );
-          // }
+          const deploymentResponse =
+            await this.k8sAutomationService.automateK8sDeployment(
+              deploymentRequest,
+            );
+          if (!deploymentResponse || !deploymentResponse.success) {
+            console.error(
+              'AWS deployment failed:',
+              deploymentResponse?.message,
+            );
+            throw new BadRequestException(
+              'Failed to deploy to AWS K8s Cluster',
+            );
+          }
 
           // Add resource to repository
           const resourceConfig =
@@ -602,12 +611,12 @@ export class ProjectRequestService {
           }
 
           // Add repository to cluster
-          // await this.databaseService.repository.update({
-          //   where: { id: request.repositoryId },
-          //   data: {
-          //     resourcesId: resource.id,
-          //   },
-          // });
+          await this.databaseService.repository.update({
+            where: { id: request.repositoryId },
+            data: {
+              resourcesId: resource.id,
+            },
+          });
 
           await this.databaseService.imageDeployment.create({
             data: {
@@ -893,9 +902,9 @@ export class ProjectRequestService {
         where: { repositoryId: repositoryId },
       });
 
-    // if (!imageDeployments || imageDeployments.length === 0) {
-    //   throw new BadRequestException('No image deployments found');
-    // }
+    if (!imageDeployments) {
+      throw new BadRequestException('No image deployments found');
+    }
     return imageDeployments;
   }
 
