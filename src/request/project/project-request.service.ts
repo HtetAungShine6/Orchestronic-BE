@@ -909,11 +909,27 @@ export class ProjectRequestService {
   }
 
   private encodeBase64(kubeconfig: string) {
-    const bufferObj = Buffer.from(kubeconfig, 'utf8');
+    const kubeconfigStr = (kubeconfig ?? '').toString().trimEnd();
+    if (!kubeconfigStr.trim()) {
+      throw new BadRequestException('kubeConfig is empty');
+    }
 
-    // Encode the Buffer content to a Base64 string
-    const base64String = bufferObj.toString('base64');
+    // If it already looks like base64 AND decoding resembles a kubeconfig, return it as-is.
+    const looksBase64 = /^[A-Za-z0-9+/=\r\n]+$/.test(kubeconfigStr);
+    if (looksBase64) {
+      try {
+        const decoded = Buffer.from(kubeconfigStr, 'base64').toString('utf8');
+        if (
+          decoded.includes('apiVersion:') &&
+          (decoded.includes('clusters:') || decoded.includes('contexts:'))
+        ) {
+          return kubeconfigStr;
+        }
+      } catch {
+        // ignore and encode below
+      }
+    }
 
-    return base64String;
+    return Buffer.from(kubeconfigStr, 'utf8').toString('base64');
   }
 }
