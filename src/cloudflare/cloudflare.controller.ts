@@ -1,15 +1,15 @@
-// dns.controller.ts
-import { Body, Controller, Param, Post } from "@nestjs/common";
-import { CloudflareService } from "./cloudflare.service";
+import { Controller, Post, Param, Body } from '@nestjs/common';
+import { CloudflareService } from './cloudflare.service';
+import { CreateDnsRecordDto } from './request/create-dns-record.dto';
 
-@Controller("dns")
-export class DnsController {
-  constructor(private readonly cf: CloudflareService) {}
+@Controller('cloudflare')
+export class CloudflareController {
+      constructor(private readonly cf: CloudflareService) {}
 
   @Post("resource-groups/:rg/wildcard")
   async upsertRgWildcard(
     @Param("rg") rg: string,
-    @Body() body: { lbPublicIp: string; proxied?: boolean },
+    @Body() body: CreateDnsRecordDto,
   ) {
     return this.cf.ensureResourceGroupWildcard({
       resourceGroup: rg,

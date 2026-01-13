@@ -36,6 +36,7 @@ import { ProjectRequestController } from './request/project/project-request.cont
 import { K8sAutomationModule } from './k8sautomation/k8sautomation.module';
 import { K8sAutomationService } from './k8sautomation/k8sautomation.service';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
+import { CloudflareModule } from './cloudflare/cloudflare.module';
 
 @Module({
   imports: [
@@ -121,6 +122,7 @@ import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
     ProjectRequestModule,
     K8sAutomationModule,
     ElasticsearchModule,
+    CloudflareModule,
   ],
   controllers: [
     AppController,
