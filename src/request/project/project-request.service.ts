@@ -10,6 +10,7 @@ import { GitlabService } from 'src/gitlab/gitlab.service';
 import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
 import { CreateClusterRequestDto } from './dto/request/create-cluster-request.dto';
+import { parse as parseYaml } from "yaml";
 import { ApiBody } from '@nestjs/swagger';
 import {
   AwsK8sCluster,
@@ -30,6 +31,7 @@ import { AwsK8sClusterDto } from './dto/response/cluster-response-aws.dto';
 import * as crypto from 'crypto';
 import { en } from '@faker-js/faker/.';
 import cluster from 'cluster';
+import { KubeConfig } from './dto/request/kubeconfig';
 
 @Injectable()
 export class ProjectRequestService {
@@ -467,11 +469,10 @@ export class ProjectRequestService {
         throw new BadRequestException('Kubeconfig not found in cluster');
       }
       
-      const encodedKubeConfig = this.encodeBase64(
+      const kubeConfig = this.kubeconfigYamlToTypedObject(
         cluster.kubeConfig
       );
       // TODO: add kubeconfig to k8s automation service by cluster id
-      const kubeConfig = encodedKubeConfig;
       host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
@@ -556,7 +557,6 @@ export class ProjectRequestService {
             throw new BadRequestException('Kubeconfig not found in cluster');
           }
 
-          const encodedKubeConfig = this.encodeBase64(cluster.kubeConfig);
           const clusterEndpoint = cluster.clusterEndpoint;
           if(!clusterEndpoint) {
             throw new BadRequestException('Cluster endpoint not found in cluster');
@@ -567,7 +567,7 @@ export class ProjectRequestService {
             throw new BadRequestException('Edge public IP not found in cluster endpoint');
           }
           // TODO: add kubeconfig to k8s automation service by cluster id
-          const kubeConfig = encodedKubeConfig;
+          const kubeConfigObject = this.kubeconfigYamlToTypedObject(cluster.kubeConfig);
           host = `${repository.name}.${cluster.clusterName}.${parsedEndpoint.edge_public_ip}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
@@ -908,28 +908,7 @@ export class ProjectRequestService {
     return imageDeployments;
   }
 
-  private encodeBase64(kubeconfig: string) {
-    const kubeconfigStr = (kubeconfig ?? '').toString().trimEnd();
-    if (!kubeconfigStr.trim()) {
-      throw new BadRequestException('kubeConfig is empty');
-    }
-
-    // If it already looks like base64 AND decoding resembles a kubeconfig, return it as-is.
-    const looksBase64 = /^[A-Za-z0-9+/=\r\n]+$/.test(kubeconfigStr);
-    if (looksBase64) {
-      try {
-        const decoded = Buffer.from(kubeconfigStr, 'base64').toString('utf8');
-        if (
-          decoded.includes('apiVersion:') &&
-          (decoded.includes('clusters:') || decoded.includes('contexts:'))
-        ) {
-          return kubeconfigStr;
-        }
-      } catch {
-        // ignore and encode below
-      }
-    }
-
-    return Buffer.from(kubeconfigStr, 'utf8').toString('base64');
+  private kubeconfigYamlToTypedObject(yamlText: string): KubeConfig {
+    return parseYaml(yamlText) as KubeConfig;
   }
 }

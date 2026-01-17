@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsOptional } from "class-validator";
+import { KubeConfig } from "src/request/project/dto/request/kubeconfig";
 
 export class CreateClusterDeploymentRequestDto {
     @ApiProperty({
@@ -34,5 +35,5 @@ export class CreateClusterDeploymentRequestDto {
         description: 'Kubeconfig content for the target Kubernetes cluster',
         example: 'apiVersion: v1\nclusters:\n- cluster:\n    certificate-authority-data: ...',
     })
-    kubeConfig: string;
+    kubeConfig: KubeConfig;
 }
