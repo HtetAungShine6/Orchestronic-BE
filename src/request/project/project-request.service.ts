@@ -581,7 +581,7 @@ export class ProjectRequestService {
           deploymentRequest.port = request.port;
           deploymentRequest.usePrivateRegistry =
             request.usePrivateRegistry ?? false;
-          deploymentRequest.kubeConfig = kubeConfig;
+          deploymentRequest.kubeConfig = kubeConfigObject;
 
           console.log('Deployment Request:', deploymentRequest);
           const deploymentResponse =
