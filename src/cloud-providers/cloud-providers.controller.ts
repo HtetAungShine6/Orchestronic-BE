@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { CloudProvidersService } from './cloud-providers.service';
-import { GetVmSizesDto } from 'src/request/dto/get-vm-sizes.dto';
+import { GetVmSizesDto } from '../request/dto/get-vm-sizes.dto';
 import { GetCloudProviderAwsDbDto } from './dto/get-cloud-provider-aws-db.dto';
 
 @Controller('cloud-providers')

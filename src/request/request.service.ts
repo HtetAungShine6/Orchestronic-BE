@@ -6,7 +6,13 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Status, Role, CloudProvider, RepositoryStatus, Resources } from '@prisma/client';
+import {
+  Status,
+  Role,
+  CloudProvider,
+  RepositoryStatus,
+  Resources,
+} from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { CreateAzureRequestDto } from './dto/create-request-azure.dto';
 import { ApiBody } from '@nestjs/swagger';
@@ -15,7 +21,7 @@ import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import { AirflowService } from '../airflow/airflow.service';
 import { RequestStatus } from './dto/request-status.dto';
 import { CreateAwsRequestDto } from './dto/create-request-aws.dto';
-import { GitlabService } from 'src/gitlab/gitlab.service';
+import { GitlabService } from '../gitlab/gitlab.service';
 
 @Injectable()
 export class RequestService {
@@ -125,8 +131,7 @@ export class RequestService {
     }
 
     let newResource: Resources | null = null;
-    if(dto.resources)
-    {
+    if (dto.resources) {
       // Create resourceConfig with VMs, DBs, STs
       const resourceConfig = await this.databaseService.resourceConfig.create({
         data: {
@@ -162,16 +167,18 @@ export class RequestService {
     // Create Repository with collaborators (using userId)
     const newRepository = await this.databaseService.repository.create({
       data: {
-      name: repository.name,
-      description: repository.description,
-      resources: newResource ? { connect: { id: newResource.id } } : undefined,
-      RepositoryCollaborator: {
-        create:
-        repository.collaborators?.map((c) => ({
-          userId: c.userId,
-          gitlabUserId: c.gitlabUserId,
-        })) || [],
-      },
+        name: repository.name,
+        description: repository.description,
+        resources: newResource
+          ? { connect: { id: newResource.id } }
+          : undefined,
+        RepositoryCollaborator: {
+          create:
+            repository.collaborators?.map((c) => ({
+              userId: c.userId,
+              gitlabUserId: c.gitlabUserId,
+            })) || [],
+        },
       },
     });
 
@@ -188,27 +195,29 @@ export class RequestService {
     // Create Request linking owner, repository, resources
     const newRequest = await this.databaseService.request.create({
       data: {
-      description: request.description,
-      displayCode,
-      owner: { connect: { id: ownerId } },
-      repository: { connect: { id: newRepository.id } },
-      resources: newResource ? { connect: { id: newResource.id } } : undefined,
+        description: request.description,
+        displayCode,
+        owner: { connect: { id: ownerId } },
+        repository: { connect: { id: newRepository.id } },
+        resources: newResource
+          ? { connect: { id: newResource.id } }
+          : undefined,
       },
       include: {
-      resources: {
-        include: {
-        resourceConfig: {
+        resources: {
           include: {
-          AzureVMInstance: true,
-          AzureDatabase: true,
-          AzureStorage: true,
-          AzureK8sCluster: true,
+            resourceConfig: {
+              include: {
+                AzureVMInstance: true,
+                AzureDatabase: true,
+                AzureStorage: true,
+                AzureK8sCluster: true,
+              },
+            },
           },
         },
-        },
-      },
-      repository: true,
-      owner: true,
+        repository: true,
+        owner: true,
       },
     });
 
@@ -340,7 +349,6 @@ export class RequestService {
     id: string,
     status: RequestStatus,
   ) {
-
     // 1️⃣ Update request status first
     const updateStatus = await this.databaseService.request.update({
       where: { id },
@@ -355,7 +363,7 @@ export class RequestService {
     if (updateStatus.status !== RequestStatus.Approved) {
       return updateStatus;
     }
-    
+
     // 3️⃣ Fetch resourcesId
     const requestEntry = await this.databaseService.request.findUniqueOrThrow({
       where: { id },
@@ -434,14 +442,16 @@ export class RequestService {
       data: { status: RepositoryStatus.Created },
     });
 
-    if (requestEntry.resourcesId !== null && requestEntry.resourcesId !== undefined) {
+    if (
+      requestEntry.resourcesId !== null &&
+      requestEntry.resourcesId !== undefined
+    ) {
       // 🔟 Fetch cloud provider
-      const resourceInfo = await this.databaseService.resources.findUniqueOrThrow(
-        {
+      const resourceInfo =
+        await this.databaseService.resources.findUniqueOrThrow({
           where: { id: requestEntry.resourcesId },
           select: { cloudProvider: true },
-        },
-      );
+        });
 
       const cloudProvider = resourceInfo.cloudProvider;
 
