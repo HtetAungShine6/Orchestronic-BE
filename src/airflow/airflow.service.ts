@@ -4,7 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { BackendJwtPayload } from 'src/lib/types';
+import { BackendJwtPayload } from '../lib/types';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 

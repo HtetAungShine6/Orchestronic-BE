@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional } from 'class-validator';
 import { CreateRepositoryDto } from './create-repository.dto';
-import { CreateAwsResourceDto } from 'src/resource/dto/create-aws-resource.dto';
+import { CreateAwsResourceDto } from '../../resource/dto/create-aws-resource.dto';
 
 export class CreateAwsRequestDto {
   @IsString()

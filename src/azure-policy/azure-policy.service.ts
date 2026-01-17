@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
-import { BackendJwtPayload } from 'src/lib/types';
+import { DatabaseService } from '../database/database.service';
+import { BackendJwtPayload } from '../lib/types';
 import { AzureVMPolicyDto } from './dto/azure-vm-policy.dto';
 import { Role } from '@prisma/client';
 import { AzureDBPolicyDto } from './dto/azure-db-policy.dto';

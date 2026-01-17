@@ -4,11 +4,11 @@ import {
   Injectable,
 } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
-import { AirflowService } from 'src/airflow/airflow.service';
-import { DatabaseService } from 'src/database/database.service';
-import { GitlabService } from 'src/gitlab/gitlab.service';
-import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
-import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
+import { AirflowService } from '../../airflow/airflow.service';
+import { DatabaseService } from '../../database/database.service';
+import { GitlabService } from '../../gitlab/gitlab.service';
+import { BackendJwtPayload, RequestWithCookies } from '../../lib/types';
+import { RabbitmqService } from '../../rabbitmq/rabbitmq.service';
 import { CreateClusterRequestDto } from './dto/request/create-cluster-request.dto';
 import { parse as parseYaml } from "yaml";
 import { ApiBody } from '@nestjs/swagger';
@@ -22,8 +22,8 @@ import { CreateProjectRequestDto } from './dto/request/create-project-request.dt
 import { AddRepositoryToK8sClusterDto } from './dto/request/update-repository.dto';
 import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
 import { NewClusterDto } from './dto/response/new-cluster-azure.dto';
-import { K8sAutomationService } from 'src/k8sautomation/k8sautomation.service';
-import { CreateClusterDeploymentRequestDto } from 'src/k8sautomation/dto/request/create-deploy-request.dto';
+import { K8sAutomationService } from '../../k8sautomation/k8sautomation.service';
+import { CreateClusterDeploymentRequestDto } from '../../k8sautomation/dto/request/create-deploy-request.dto';
 import { UserClustersPayloadDto } from './dto/response/get-cluster-by-user-id-response.dto';
 import { CreateClusterAzureResponseDto } from './dto/response/create-cluster-azure-response.dto';
 import { UpdateClusterRequestStatusDto } from './dto/request/update-cluster.dto';
@@ -558,13 +558,17 @@ export class ProjectRequestService {
           }
 
           const clusterEndpoint = cluster.clusterEndpoint;
-          if(!clusterEndpoint) {
-            throw new BadRequestException('Cluster endpoint not found in cluster');
+          if (!clusterEndpoint) {
+            throw new BadRequestException(
+              'Cluster endpoint not found in cluster',
+            );
           }
           const parsedEndpoint = JSON.parse(clusterEndpoint);
 
-          if(!parsedEndpoint.edge_public_ip) {
-            throw new BadRequestException('Edge public IP not found in cluster endpoint');
+          if (!parsedEndpoint.edge_public_ip) {
+            throw new BadRequestException(
+              'Edge public IP not found in cluster endpoint',
+            );
           }
           // TODO: add kubeconfig to k8s automation service by cluster id
           const kubeConfigObject = this.kubeconfigYamlToTypedObject(cluster.kubeConfig);
@@ -896,7 +900,7 @@ export class ProjectRequestService {
     return resourceConfig;
   }
 
-  async   findImageDeploymentsByRepoId(repositoryId: string) {
+  async findImageDeploymentsByRepoId(repositoryId: string) {
     const imageDeployments =
       await this.databaseService.imageDeployment.findFirst({
         where: { repositoryId: repositoryId },

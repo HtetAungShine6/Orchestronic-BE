@@ -2,7 +2,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { OIDCStrategy } from 'passport-azure-ad';
 import { profile } from 'console';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from '../../database/database.service';
 import { Role } from '@prisma/client';
 
 @Injectable()

@@ -4,7 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 // import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { ValidationPipe } from '@nestjs/common';
 // import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import * as cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import * as session from 'express-session';
 
 async function bootstrap() {
