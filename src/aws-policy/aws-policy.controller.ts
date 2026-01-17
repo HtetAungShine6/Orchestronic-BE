@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { AwsPolicyService } from './aws-policy.service';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
+import { BackendJwtPayload, RequestWithCookies } from '../lib/types';
 import * as jwt from 'jsonwebtoken';
 import { AwsVMPolicyDto } from './dto/aws-vm-policy.dto';
 import { AwsDBPolicyDto } from './dto/aws-db-policy.dto';

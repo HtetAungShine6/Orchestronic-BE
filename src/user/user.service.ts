@@ -3,7 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { Role, User } from '@prisma/client';
 import { BackendJwtPayload } from '../lib/types';
-import { GitlabService } from 'src/gitlab/gitlab.service';
+import { GitlabService } from '../gitlab/gitlab.service';
 
 @Injectable()
 export class UserService {
@@ -79,8 +79,8 @@ export class UserService {
       where: { id: userId },
       data: {
         gitlabUrl,
-        gitlabId: gitlabUser.id, 
-        gitlabName: username, 
+        gitlabId: gitlabUser.id,
+        gitlabName: username,
       },
     });
   }

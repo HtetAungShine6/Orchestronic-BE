@@ -2,7 +2,7 @@ import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
-import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
+import { BackendJwtPayload, RequestWithCookies } from '../lib/types';
 import * as jwt from 'jsonwebtoken';
 
 @Controller('auth')

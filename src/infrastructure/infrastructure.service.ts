@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { CreateInfrastructureDto } from './dto/create-infrastructure.dto';
 import { UpdateInfrastructureDto } from './dto/update-infrastructure.dto';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from '../database/database.service';
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import { AirflowService } from '../airflow/airflow.service';
 import { CloudProvider } from '@prisma/client';
-import { BackendJwtPayload } from 'src/lib/types';
-import { GitlabService } from 'src/gitlab/gitlab.service';
+import { BackendJwtPayload } from '../lib/types';
+import { GitlabService } from '../gitlab/gitlab.service';
 
 @Injectable()
 export class InfrastructureService {

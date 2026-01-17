@@ -13,7 +13,7 @@ import * as jwt from 'jsonwebtoken';
 import { InfrastructureService } from './infrastructure.service';
 import { CreateInfrastructureDto } from './dto/create-infrastructure.dto';
 import { UpdateInfrastructureDto } from './dto/update-infrastructure.dto';
-import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
+import { BackendJwtPayload, RequestWithCookies } from '../lib/types';
 
 @Controller('infrastructure')
 export class InfrastructureController {

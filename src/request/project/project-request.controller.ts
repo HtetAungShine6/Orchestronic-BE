@@ -1,4 +1,4 @@
-import { GitlabService } from 'src/gitlab/gitlab.service';
+import { GitlabService } from '../../gitlab/gitlab.service';
 import { ProjectRequestService } from './project-request.service';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -13,7 +13,7 @@ import {
   Request,
   UnauthorizedException,
 } from '@nestjs/common';
-import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
+import { BackendJwtPayload, RequestWithCookies } from '../../lib/types';
 import * as jwt from 'jsonwebtoken';
 import { CloudProvider, Status } from '@prisma/client';
 import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
@@ -247,8 +247,12 @@ export class ProjectRequestController {
   }
 
   @Get('cluster/:clusterRequestId')
-  async getAzureClusterRequestById(@Param('clusterRequestId') clusterRequestId: string) {
-    return this.clusterRequestService.findClusterRequestsByReqId(clusterRequestId);
+  async getAzureClusterRequestById(
+    @Param('clusterRequestId') clusterRequestId: string,
+  ) {
+    return this.clusterRequestService.findClusterRequestsByReqId(
+      clusterRequestId,
+    );
   }
 
   @Get('clusters')
@@ -467,9 +471,13 @@ export class ProjectRequestController {
   @ApiOperation({
     summary: 'Get resources by cluster ID',
   })
-  async getClusterResourcesById(@Param('clusterRequestId') clusterRequestId: string) {
+  async getClusterResourcesById(
+    @Param('clusterRequestId') clusterRequestId: string,
+  ) {
     const response =
-      await this.clusterRequestService.findClusterResourcesById(clusterRequestId);
+      await this.clusterRequestService.findClusterResourcesById(
+        clusterRequestId,
+      );
     if (!response) {
       throw new Error('No resources found for cluster');
     }
@@ -481,9 +489,13 @@ export class ProjectRequestController {
   @ApiOperation({
     summary: 'Get resource config by cluster ID',
   })
-  async getClusterResourceConfigById(@Param('clusterRequestId') clusterRequestId: string) {
+  async getClusterResourceConfigById(
+    @Param('clusterRequestId') clusterRequestId: string,
+  ) {
     const response =
-      await this.clusterRequestService.findClusterResourceConfigById(clusterRequestId);
+      await this.clusterRequestService.findClusterResourceConfigById(
+        clusterRequestId,
+      );
     if (!response) {
       throw new Error('No resource config found for cluster');
     }
@@ -504,13 +516,19 @@ export class ProjectRequestController {
 
     return response;
   }
-  
+
   @Get('/deployments/:repositoryId')
-  async getImageDeploymentsByRepoId(@Param('repositoryId') repositoryId: string) {
+  async getImageDeploymentsByRepoId(
+    @Param('repositoryId') repositoryId: string,
+  ) {
     const response =
-      await this.clusterRequestService.findImageDeploymentsByRepoId(repositoryId);
+      await this.clusterRequestService.findImageDeploymentsByRepoId(
+        repositoryId,
+      );
     if (!response) {
-      throw new Error('No image deployments found for the specified repository');
+      throw new Error(
+        'No image deployments found for the specified repository',
+      );
     }
     return response;
   }
