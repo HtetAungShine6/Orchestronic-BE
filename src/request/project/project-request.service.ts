@@ -10,7 +10,7 @@ import { GitlabService } from '../../gitlab/gitlab.service';
 import { BackendJwtPayload, RequestWithCookies } from '../../lib/types';
 import { RabbitmqService } from '../../rabbitmq/rabbitmq.service';
 import { CreateClusterRequestDto } from './dto/request/create-cluster-request.dto';
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml } from 'yaml';
 import { ApiBody } from '@nestjs/swagger';
 import {
   AwsK8sCluster,
@@ -461,19 +461,19 @@ export class ProjectRequestService {
             },
           );
 
-      if (!cluster) {
-        throw new BadRequestException('Azure K8s Cluster not found');
-      }
-      
-      if (!cluster.kubeConfig) {
-        throw new BadRequestException('Kubeconfig not found in cluster');
-      }
-      
-      const kubeConfig = this.kubeconfigYamlToTypedObject(
-        cluster.kubeConfig
-      );
-      // TODO: add kubeconfig to k8s automation service by cluster id
-      host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
+          if (!cluster) {
+            throw new BadRequestException('Azure K8s Cluster not found');
+          }
+
+          if (!cluster.kubeConfig) {
+            throw new BadRequestException('Kubeconfig not found in cluster');
+          }
+
+          const kubeConfig = this.kubeconfigYamlToTypedObject(
+            cluster.kubeConfig,
+          );
+          // TODO: add kubeconfig to k8s automation service by cluster id
+          host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = repository.name;
@@ -515,13 +515,9 @@ export class ProjectRequestService {
             throw new BadRequestException('Resource not found');
           }
 
-          // Add repository to cluster
-          const response = await this.databaseService.repository.update({
-            where: { id: request.repositoryId },
-            data: {
-              resourcesId: resource.id,
-            },
-          });
+          // Note: Not linking resourcesId directly to repository for K8s deployments
+          // as multiple repositories can share the same cluster resource.
+          // The ImageDeployment table properly tracks the repository-cluster relationship.
 
           await this.databaseService.imageDeployment.create({
             data: {
@@ -533,7 +529,7 @@ export class ProjectRequestService {
             },
           });
 
-          return response;
+          return host;
         } catch (error) {
           console.error('Error deploying to Azure K8s Cluster:', error);
           console.error('Error stack:', error.stack);
@@ -571,7 +567,9 @@ export class ProjectRequestService {
             );
           }
           // TODO: add kubeconfig to k8s automation service by cluster id
-          const kubeConfigObject = this.kubeconfigYamlToTypedObject(cluster.kubeConfig);
+          const kubeConfigObject = this.kubeconfigYamlToTypedObject(
+            cluster.kubeConfig,
+          );
           host = `${repository.name}.${cluster.clusterName}.${parsedEndpoint.edge_public_ip}.nip.io`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
@@ -614,13 +612,9 @@ export class ProjectRequestService {
             throw new BadRequestException('Resource not found');
           }
 
-          // Add repository to cluster
-          await this.databaseService.repository.update({
-            where: { id: request.repositoryId },
-            data: {
-              resourcesId: resource.id,
-            },
-          });
+          // Note: Not linking resourcesId directly to repository for K8s deployments
+          // as multiple repositories can share the same cluster resource.
+          // The ImageDeployment table properly tracks the repository-cluster relationship.
 
           await this.databaseService.imageDeployment.create({
             data: {
