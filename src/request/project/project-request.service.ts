@@ -24,6 +24,7 @@ import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
 import { NewClusterDto } from './dto/response/new-cluster-azure.dto';
 import { K8sAutomationService } from '../../k8sautomation/k8sautomation.service';
 import { CreateClusterDeploymentRequestDto } from '../../k8sautomation/dto/request/create-deploy-request.dto';
+import { CloudflareService } from '../../cloudflare/cloudflare.service';
 import { UserClustersPayloadDto } from './dto/response/get-cluster-by-user-id-response.dto';
 import { CreateClusterAzureResponseDto } from './dto/response/create-cluster-azure-response.dto';
 import { UpdateClusterRequestStatusDto } from './dto/request/update-cluster.dto';
@@ -41,6 +42,7 @@ export class ProjectRequestService {
     private readonly airflowService: AirflowService,
     private readonly gitlabService: GitlabService,
     private readonly k8sAutomationService: K8sAutomationService,
+    private readonly cloudflareService: CloudflareService,
   ) {}
 
   // async createProjectRequest(
@@ -472,8 +474,35 @@ export class ProjectRequestService {
           const kubeConfig = this.kubeconfigYamlToTypedObject(
             cluster.kubeConfig,
           );
+
+          // Register DNS record with Cloudflare
+          const clusterIp = cluster.clusterFqdn; // Extract the public IP from cluster FQDN
+          
+          if (!clusterIp) {
+            console.warn(`Cluster ${cluster.clusterName} has no FQDN/IP, skipping DNS registration`);
+          } else {
+            const wildcardDomain = `*.${cluster.clusterName}.orchestronic.dev`;
+            try {
+              const dnsResult = await this.cloudflareService.upsertARecord({
+                fqdn: wildcardDomain,
+                ip: clusterIp,
+                proxied: false,
+                ttl: 1,
+              });
+            
+            if (dnsResult.action === 'created') {
+              console.log(`DNS record created for ${wildcardDomain} -> ${clusterIp}`);
+            } else if (dnsResult.action === 'found') {
+              console.log(`DNS record already exists for ${wildcardDomain}, skipping registration`);
+            }
+            } catch (error) {
+              console.error('Failed to register DNS record with Cloudflare:', error);
+              // Continue with deployment even if DNS registration fails
+            }
+          }
+
           // TODO: add kubeconfig to k8s automation service by cluster id
-          host = `${repository.name}.${cluster.clusterName}.${cluster.clusterFqdn}.nip.io`;
+          host = `${repository.name}.${cluster.clusterName}.orchestronic.dev`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = repository.name;
@@ -566,6 +595,27 @@ export class ProjectRequestService {
               'Edge public IP not found in cluster endpoint',
             );
           }
+          // Register DNS record with Cloudflare
+          const clusterIp = parsedEndpoint.edge_public_ip;
+          const wildcardDomain = `*.${cluster.clusterName}.orchestronic.dev`;
+          try {
+            const dnsResult = await this.cloudflareService.upsertARecord({
+              fqdn: wildcardDomain,
+              ip: clusterIp,
+              proxied: false,
+              ttl: 1,
+            });
+            
+            if (dnsResult.action === 'created') {
+              console.log(`DNS record created for ${wildcardDomain} -> ${clusterIp}`);
+            } else if (dnsResult.action === 'found') {
+              console.log(`DNS record already exist for ${wildcardDomain} -> ${clusterIp}`);
+            }
+          } catch (error) {
+            console.error('Failed to register DNS record with Cloudflare:', error);
+            // Continue with deployment even if DNS registration fails
+          }
+
           // TODO: add kubeconfig to k8s automation service by cluster id
           const kubeConfigObject = this.kubeconfigYamlToTypedObject(
             cluster.kubeConfig,

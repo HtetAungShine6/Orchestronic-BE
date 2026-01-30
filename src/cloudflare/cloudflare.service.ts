@@ -2,6 +2,7 @@
 import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { firstValueFrom } from "rxjs";
+import { ac } from "@faker-js/faker/dist/airline-BUL6NtOJ";
 
 type CfDnsRecord = {
   id: string;
@@ -30,7 +31,7 @@ export class CloudflareService {
     ttl?: number;          // 1 = auto
   }) {
     const { fqdn, ip } = params;
-    const proxied = params.proxied ?? true;
+    const proxied = params.proxied ?? false;
     const ttl = params.ttl ?? 1;
     const baseUrl = process.env.CLOUDFLARE_BASE_URL;
     const zoneId = process.env.CLOUDFLARE_ZONE_ID;
@@ -45,36 +46,38 @@ export class CloudflareService {
 
     const existing: CfDnsRecord | undefined = searchRes.data?.result?.[0];
 
-    // 2) Create if not exists
-    if (!existing) {
-      const createUrl = `${baseUrl}/zones/${zoneId}/dns_records`;
-      const createRes = await firstValueFrom(
-        this.http.post(
-          createUrl,
-          { type: "A", name: fqdn, content: ip, proxied, ttl },
-          { headers: this.headers },
-        ),
-      );
-      return { action: "created", record: createRes.data.result };
+    // 2) Create if exists
+    if (existing) {
+      return { action: "found" };
     }
 
-    // 3) Update if changed (idempotent)
-    const needsUpdate =
-      existing.content !== ip || (existing.proxied ?? false) !== proxied;
-
-    if (!needsUpdate) {
-      return { action: "unchanged", record: existing };
-    }
-
-    const updateUrl = `${baseUrl}/zones/${zoneId}/dns_records/${existing.id}`;
-    const updateRes = await firstValueFrom(
-      this.http.put(
-        updateUrl,
+    const createUrl = `${baseUrl}/zones/${zoneId}/dns_records`;
+    const createRes = await firstValueFrom(
+      this.http.post(
+        createUrl,
         { type: "A", name: fqdn, content: ip, proxied, ttl },
         { headers: this.headers },
       ),
     );
-    return { action: "updated", record: updateRes.data.result };
+    return { action: "created", record: createRes.data.result };
+
+    // // 3) Update if changed (idempotent)
+    // const needsUpdate =
+    //   existing.content !== ip || (existing.proxied ?? false) !== proxied;
+
+    // if (!needsUpdate) {
+    //   return { action: "unchanged", record: existing };
+    // }
+
+    // const updateUrl = `${baseUrl}/zones/${zoneId}/dns_records/${existing.id}`;
+    // const updateRes = await firstValueFrom(
+    //   this.http.put(
+    //     updateUrl,
+    //     { type: "A", name: fqdn, content: ip, proxied, ttl },
+    //     { headers: this.headers },
+    //   ),
+    // );
+    // return { action: "updated", record: updateRes.data.result };
   }
 
   async ensureResourceGroupWildcard(params: {

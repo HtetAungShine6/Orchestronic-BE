@@ -10,6 +10,7 @@ import { DatabaseModule } from '../../database/database.module';
 import { ProjectRequestController } from './project-request.controller';
 import { ProjectRequestService } from './project-request.service';
 import { K8sAutomationModule } from '../../k8sautomation/k8sautomation.module';
+import { CloudflareModule } from '../../cloudflare/cloudflare.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { K8sAutomationModule } from '../../k8sautomation/k8sautomation.module';
       defaultStrategy: 'AzureAD',
     }),
     K8sAutomationModule,
+    CloudflareModule,
   ],
   controllers: [ProjectRequestController],
   providers: [
