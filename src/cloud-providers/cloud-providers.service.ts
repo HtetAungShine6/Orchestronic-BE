@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
-import { RequestService } from 'src/request/request.service';
-import { GetVmSizesDto } from 'src/request/dto/get-vm-sizes.dto';
+import { DatabaseService } from '../database/database.service';
+import { RequestService } from '../request/request.service';
+import { GetVmSizesDto } from '../request/dto/get-vm-sizes.dto';
 import { Engine } from '@prisma/client';
 
 @Injectable()

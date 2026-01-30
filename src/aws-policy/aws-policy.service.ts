@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { DatabaseService } from 'src/database/database.service';
-import { BackendJwtPayload } from 'src/lib/types';
+import { DatabaseService } from '../database/database.service';
+import { BackendJwtPayload } from '../lib/types';
 import { AwsVMPolicyDto } from './dto/aws-vm-policy.dto';
 import { AwsDBPolicyDto } from './dto/aws-db-policy.dto';
 import { AwsSTPolicyDto } from './dto/aws-st-policy.dto';
@@ -68,5 +68,17 @@ export class AwsPolicyService {
         ...policyData,
       },
     });
+  }
+
+  getPolicyClusterAWS() {
+    try {
+      return this.databaseService.awsPolicyVM.findFirst({
+        where: {
+          name: '',
+        },
+      });
+    } catch (error) {
+      throw new Error('Failed to fetch VM policy');
+    }
   }
 }

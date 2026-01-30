@@ -8,6 +8,14 @@
     "resourceDiskSizeInMB": 4096
   },
   {
+    "maxDataDiskCount": 4,
+    "memoryInMB": 8192,
+    "name": "Standard_D2s_v3",
+    "numberOfCores": 2,
+    "osDiskSizeInMB": 1047552,
+    "resourceDiskSizeInMB": 16384
+  },
+  {
     "maxDataDiskCount": 2,
     "memoryInMB": 2048,
     "name": "Standard_B1ms",
@@ -1254,14 +1262,6 @@
     "numberOfCores": 64,
     "osDiskSizeInMB": 1047552,
     "resourceDiskSizeInMB": 1638400
-  },
-  {
-    "maxDataDiskCount": 4,
-    "memoryInMB": 8192,
-    "name": "Standard_D2s_v3",
-    "numberOfCores": 2,
-    "osDiskSizeInMB": 1047552,
-    "resourceDiskSizeInMB": 16384
   },
   {
     "maxDataDiskCount": 8,

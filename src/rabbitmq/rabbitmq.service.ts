@@ -7,6 +7,7 @@ export class RabbitmqService {
     @Inject('RABBITMQ_SERVICE_1') private rabbitClient1: ClientProxy,
     @Inject('RABBITMQ_SERVICE_2') private rabbitClient2: ClientProxy,
     @Inject('RABBITMQ_SERVICE_3') private rabbitClient3: ClientProxy,
+    @Inject('RABBITMQ_SERVICE_4') private rabbitClient4: ClientProxy,
   ) {}
 
   queueRequest(requestId: string) {
@@ -21,6 +22,13 @@ export class RabbitmqService {
     console.log(`(Destroy) Request ID sent to RabbitMQ: ${requestId}`);
 
     return { message: 'Destroy Request queued successfully', requestId };
+  }
+
+  destroyK8sRequest(resourceId: string) {
+    this.rabbitClient4.emit('destroyK8s', { resourceId });
+    console.log(`(Destroy K8s) Resource ID sent to RabbitMQ: ${resourceId}`);
+
+    return { message: 'Destroy K8s Request queued successfully', resourceId };
   }
 
   queueResource(resourceId: string) {

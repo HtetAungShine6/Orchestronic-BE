@@ -4,7 +4,7 @@ import { UpdateGitlabDto } from './dto/update-gitlab.dto';
 
 @Injectable()
 export class GitlabService {
-  private readonly gitlabUrl = process.env.GITLAB_URL;
+  private readonly gitlabUrl = process.env.GITLAB_URL || 'http://gitlaborchestronic.dev/api/v4';
   private readonly token = process.env.GITLAB_TOKEN;
 
   async createProject(createGitlabDto: CreateGitlabDto) {

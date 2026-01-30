@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { Status } from "@prisma/client";
 import { IsOptional, IsString } from "class-validator";
-import { CreateAzureClusterResourceDto } from "src/resource/cluster-resource/dto/create-azure-cluster-resource.dto";
-export class CreateAzureClusterDto {
+export class UpdateClusterRequestStatusDto {
     // @IsString()
     // @ApiProperty({ example: 'uuid-of-cluster-request' })
     // requestId: string;
@@ -13,8 +13,14 @@ export class CreateAzureClusterDto {
         description: 'A description of the cluster request',
         required: false,
     })
-    description: string;
+    clusterRequestId: string;
 
-    @ApiProperty({ type: CreateAzureClusterResourceDto })
-    resources: CreateAzureClusterResourceDto;
+    @IsString()
+    @IsOptional()
+    @ApiProperty({
+        example: 'Cluster request description',
+        description: 'A description of the cluster request',
+        required: false,
+    })
+    status: Status;
 }

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CreateClusterResourceAzureConfigDto } from '../../../request/project/dto/request/create-cluster-resource-azure-config.dto';
-export class CreateAzureClusterResourceDto {
+import { CreateClusterResourceAWSConfigDto } from './create-cluster-resource-aws-config.dto';
+export class CreateAWSClusterResourceDto {
   @ApiProperty({
     example: 'rg-repository-name',
     description: 'The name of the resource group',
@@ -8,20 +8,20 @@ export class CreateAzureClusterResourceDto {
   name: string;
 
   @ApiProperty({
-    example: 'azure',
+    example: 'aws',
     description: 'The cloud provider for the resources',
     required: false,
   })
   cloudProvider: string;
 
   @ApiProperty({
-    example: 'eastasia',
+    example: 'ap-southeast-1',
     description: 'The region where the resources are located',
     required: false,
   })
   region: string;
 
   @ApiProperty({
-    type: CreateClusterResourceAzureConfigDto })
-  resourceConfig: CreateClusterResourceAzureConfigDto;
+    type: CreateClusterResourceAWSConfigDto })
+  resourceConfig: CreateClusterResourceAWSConfigDto;
 }

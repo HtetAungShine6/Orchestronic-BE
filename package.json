@@ -21,11 +21,14 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.30.0",
+    "@elastic/elasticsearch": "^9.2.0",
     "@faker-js/faker": "^9.8.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
+    "@nestjs/elasticsearch": "^11.1.0",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/microservices": "^11.1.6",
     "@nestjs/passport": "^11.0.5",
@@ -52,7 +55,8 @@
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.24"
+    "typeorm": "^0.3.24",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

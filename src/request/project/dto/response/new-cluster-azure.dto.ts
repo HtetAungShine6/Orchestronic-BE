@@ -13,9 +13,9 @@ export class NewClusterDto {
 
     @IsOptional()
     @ApiProperty({
-        example: 'uuid-of-resource',
-        description: 'The unique identifier of the associated resource',
+        example: 'uuid-of-cluster-request',
+        description: 'The unique identifier of the associated cluster request',
         required: true,
     })
-    resourceId?: string;
+    clusterReqId?: string;
 }

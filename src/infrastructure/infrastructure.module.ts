@@ -6,7 +6,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AirflowService } from '../airflow/airflow.service';
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import { HttpModule } from '@nestjs/axios';
-import { GitlabService } from 'src/gitlab/gitlab.service';
+import { GitlabService } from '../gitlab/gitlab.service';
 
 @Module({
   imports: [
@@ -35,6 +35,14 @@ import { GitlabService } from 'src/gitlab/gitlab.service';
         options: {
           urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
           queue: 'resource',
+        },
+      },
+      {
+        name: 'RABBITMQ_SERVICE_4',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+          queue: 'destroyK8s',
         },
       },
     ]),

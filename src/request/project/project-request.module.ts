@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
-import { GitlabService } from 'src/gitlab/gitlab.service';
-import { RepositoriesService } from 'src/repositories/repositories.service';
-import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
+import { GitlabService } from '../../gitlab/gitlab.service';
+import { RepositoriesService } from '../../repositories/repositories.service';
+import { RabbitmqService } from '../../rabbitmq/rabbitmq.service';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PassportModule } from '@nestjs/passport';
-import { AirflowService } from 'src/airflow/airflow.service';
+import { AirflowService } from '../../airflow/airflow.service';
 import { HttpModule } from '@nestjs/axios';
-import { DatabaseModule } from 'src/database/database.module';
+import { DatabaseModule } from '../../database/database.module';
 import { ProjectRequestController } from './project-request.controller';
 import { ProjectRequestService } from './project-request.service';
-import { K8sAutomationModule } from 'src/k8sautomation/k8sautomation.module';
+import { K8sAutomationModule } from '../../k8sautomation/k8sautomation.module';
+import { CloudflareModule } from '../../cloudflare/cloudflare.module';
 
 @Module({
   imports: [
@@ -40,11 +41,20 @@ import { K8sAutomationModule } from 'src/k8sautomation/k8sautomation.module';
           queue: 'resource',
         },
       },
+      {
+        name: 'RABBITMQ_SERVICE_4',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+          queue: 'destroyK8s',
+        },
+      },
     ]),
     PassportModule.register({
       defaultStrategy: 'AzureAD',
     }),
     K8sAutomationModule,
+    CloudflareModule,
   ],
   controllers: [ProjectRequestController],
   providers: [

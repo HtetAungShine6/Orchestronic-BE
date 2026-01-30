@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
-import { BackendJwtPayload } from 'src/lib/types';
+import { DatabaseService } from '../database/database.service';
+import { BackendJwtPayload } from '../lib/types';
 import { AzureVMPolicyDto } from './dto/azure-vm-policy.dto';
 import { Role } from '@prisma/client';
 import { AzureDBPolicyDto } from './dto/azure-db-policy.dto';
@@ -97,6 +97,19 @@ export class AzurePolicyService {
     } catch (error) {
       console.error('Error fetching ST policies:', error);
       throw new Error('Failed to fetch ST policies');
+    }
+  }
+
+  getPolicyClusterAzure() {
+    try {
+      return this.databaseService.azurePolicyVM.findFirst({
+        where: {
+          name: 'Standard_D2s_v3',
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching VM policy:', error);
+      throw new Error('Failed to fetch VM policy');
     }
   }
 }

@@ -3,22 +3,36 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { AirflowService } from 'src/airflow/airflow.service';
-import { DatabaseService } from 'src/database/database.service';
-import { GitlabService } from 'src/gitlab/gitlab.service';
-import { BackendJwtPayload } from 'src/lib/types';
-import { RabbitmqService } from 'src/rabbitmq/rabbitmq.service';
-import { CreateAzureClusterDto } from './dto/request/create-cluster-azure.dto';
+import * as jwt from 'jsonwebtoken';
+import { AirflowService } from '../../airflow/airflow.service';
+import { DatabaseService } from '../../database/database.service';
+import { GitlabService } from '../../gitlab/gitlab.service';
+import { BackendJwtPayload, RequestWithCookies } from '../../lib/types';
+import { RabbitmqService } from '../../rabbitmq/rabbitmq.service';
+import { CreateClusterRequestDto } from './dto/request/create-cluster-request.dto';
+import { parse as parseYaml } from 'yaml';
 import { ApiBody } from '@nestjs/swagger';
-import { CloudProvider, deployStatus, Status } from '@prisma/client';
+import {
+  AwsK8sCluster,
+  CloudProvider,
+  deployStatus,
+  Status,
+} from '@prisma/client';
 import { CreateProjectRequestDto } from './dto/request/create-project-request.dto';
-import { AddRepositoryToAzureClusterDto } from './dto/request/update-repository-azure.dto';
+import { AddRepositoryToK8sClusterDto } from './dto/request/update-repository.dto';
 import { AzureK8sClusterDto } from './dto/response/cluster-response-azure.dto';
 import { NewClusterDto } from './dto/response/new-cluster-azure.dto';
-import { K8sAutomationService } from 'src/k8sautomation/k8sautomation.service';
-import { CreateClusterDeploymentRequestDto } from 'src/k8sautomation/dto/request/create-deploy-request.dto';
+import { K8sAutomationService } from '../../k8sautomation/k8sautomation.service';
+import { CreateClusterDeploymentRequestDto } from '../../k8sautomation/dto/request/create-deploy-request.dto';
+import { CloudflareService } from '../../cloudflare/cloudflare.service';
 import { UserClustersPayloadDto } from './dto/response/get-cluster-by-user-id-response.dto';
 import { CreateClusterAzureResponseDto } from './dto/response/create-cluster-azure-response.dto';
+import { UpdateClusterRequestStatusDto } from './dto/request/update-cluster.dto';
+import { AwsK8sClusterDto } from './dto/response/cluster-response-aws.dto';
+import * as crypto from 'crypto';
+import { en } from '@faker-js/faker/.';
+import cluster from 'cluster';
+import { KubeConfig } from './dto/request/kubeconfig';
 
 @Injectable()
 export class ProjectRequestService {
@@ -28,6 +42,7 @@ export class ProjectRequestService {
     private readonly airflowService: AirflowService,
     private readonly gitlabService: GitlabService,
     private readonly k8sAutomationService: K8sAutomationService,
+    private readonly cloudflareService: CloudflareService,
   ) {}
 
   // async createProjectRequest(
@@ -130,8 +145,11 @@ export class ProjectRequestService {
   //   }
   // }
 
-  @ApiBody({ type: CreateAzureClusterDto })
-  async createCluster(user: BackendJwtPayload, request: CreateAzureClusterDto) {
+  @ApiBody({ type: CreateClusterRequestDto })
+  async createCluster(
+    user: BackendJwtPayload,
+    request: CreateClusterRequestDto,
+  ) {
     const ownerId = user.id;
     const resources = request.resources;
     const provider = (
@@ -146,22 +164,57 @@ export class ProjectRequestService {
       throw new BadRequestException('Authenticated user not found in database');
     }
 
-    const resourceConfig = await this.databaseService.resourceConfig.create({
-      data: {
-        AzureK8sCluster: {
-          create: resources.resourceConfig.aks || [],
+    if (provider == CloudProvider.AZURE) {
+      const resourceConfig = await this.databaseService.resourceConfig.create({
+        data: {
+          AzureK8sCluster: {
+            create: resources.resourceConfig.cluster || [],
+          },
         },
-      },
-    });
+      });
 
-    const newResource = await this.databaseService.resources.create({
-      data: {
-        name: resources.name,
-        cloudProvider: provider,
-        region: resources.region,
-        resourceConfig: { connect: { id: resourceConfig.id } },
-      },
-    });
+      const newResource = await this.databaseService.resources.create({
+        data: {
+          name: resources.name,
+          cloudProvider: provider,
+          region: resources.region,
+          resourceConfig: { connect: { id: resourceConfig.id } },
+        },
+      });
+
+      return await this.databaseService.clusterRequest.create({
+        data: {
+          ownerId: ownerInDb.id,
+          resourceId: newResource.id,
+        },
+      });
+    }
+
+    if (provider == CloudProvider.AWS) {
+      const resourceConfig = await this.databaseService.resourceConfig.create({
+        data: {
+          AwsK8sCluster: {
+            create: resources.resourceConfig.cluster || [],
+          },
+        },
+      });
+
+      const newResource = await this.databaseService.resources.create({
+        data: {
+          name: resources.name,
+          cloudProvider: provider,
+          region: resources.region,
+          resourceConfig: { connect: { id: resourceConfig.id } },
+        },
+      });
+
+      return await this.databaseService.clusterRequest.create({
+        data: {
+          ownerId: ownerInDb.id,
+          resourceId: newResource.id,
+        },
+      });
+    }
 
     // const updatedClusterRequest = await this.databaseService.request.update({
     //   where: { id: request.requestId },
@@ -179,33 +232,95 @@ export class ProjectRequestService {
     //     'Failed to update cluster request with resources',
     //   );
     // }
-    await Promise.all([
-      this.rabbitmqService.queueResource(newResource.id),
-      this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
-    ]);
 
-    // Cannot retrieve cluster ID here, will be updated after workflow is done
+    // reuse that in patch route later
+    // await Promise.all([
+    //   this.rabbitmqService.queueResource(newResource.id),
+    //   this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
+    // ]);
+
+    // // Cannot retrieve cluster ID here, will be updated after workflow is done
+    // const clusterResponse = new CreateClusterAzureResponseDto();
+    // clusterResponse.statuscode = 201;
+
+    // const newClusterDto = new NewClusterDto();
+    // newClusterDto.resourceId = newResource.id;
+    // clusterResponse.message = newClusterDto;
+
+    // return clusterResponse;
+  }
+
+  async updateClusterRequestStatus(
+    user: BackendJwtPayload,
+    updateClusterDto: UpdateClusterRequestStatusDto,
+  ) {
+    const clusterRequest = await this.databaseService.clusterRequest.findUnique(
+      {
+        where: { id: updateClusterDto.clusterRequestId },
+      },
+    );
+
+    if (!clusterRequest) {
+      throw new BadRequestException('Cluster request not found');
+    }
+
+    const resource = await this.databaseService.resources.findUnique({
+      where: { id: clusterRequest.resourceId },
+    });
+
+    if (!resource) {
+      throw new BadRequestException(
+        'Resource not found for the cluster request',
+      );
+    }
+
+    // update status first
+    await this.databaseService.clusterRequest.update({
+      where: { id: clusterRequest.id },
+      data: { status: updateClusterDto.status },
+    });
+
+    if (
+      updateClusterDto.status === Status.Approved &&
+      resource.cloudProvider === CloudProvider.AZURE
+    ) {
+      await Promise.all([
+        this.rabbitmqService.queueResource(clusterRequest.resourceId),
+        this.airflowService.triggerDag(user, 'AZURE_Resource_Group_Cluster'),
+      ]);
+    }
+
+    if (
+      updateClusterDto.status === Status.Approved &&
+      resource.cloudProvider === CloudProvider.AWS
+    ) {
+      await Promise.all([
+        this.rabbitmqService.queueResource(clusterRequest.resourceId),
+        this.airflowService.triggerDag(user, 'AWS_Resources_Cluster'),
+      ]);
+    }
+
     const clusterResponse = new CreateClusterAzureResponseDto();
     clusterResponse.statuscode = 201;
-    
+
     const newClusterDto = new NewClusterDto();
-    newClusterDto.resourceId = newResource.id;
+    newClusterDto.clusterReqId = clusterRequest.id;
     clusterResponse.message = newClusterDto;
 
     return clusterResponse;
   }
 
-  async findClusterByUserId(userId: string) {
+  async findClusterByUserId(user: BackendJwtPayload) {
     const awsClusters = await this.databaseService.awsK8sCluster.findMany({
       where: {
-        resourceConfig: { resources: { request: { ownerId: userId } } },
+        resourceConfig: { resources: { request: { ownerId: user.id } } },
       },
       include: { resourceConfig: { include: { resources: true } } },
     });
 
     const azureClusters = await this.databaseService.azureK8sCluster.findMany({
       where: {
-        resourceConfig: { resources: { request: { ownerId: userId } } },
+        resourceConfig: { resources: { request: { ownerId: user.id } } },
       },
       include: { resourceConfig: { include: { resources: true } } },
     });
@@ -225,7 +340,7 @@ export class ProjectRequestService {
 
   async findClusterById(clusterId: string, provider: CloudProvider) {
     if (provider === CloudProvider.AWS) {
-      return this.databaseService.awsK8sCluster.findUnique({
+      const response = await this.databaseService.awsK8sCluster.findUnique({
         where: { id: clusterId },
         select: {
           clusterName: true,
@@ -237,6 +352,27 @@ export class ProjectRequestService {
           resourceConfigId: true,
         },
       });
+
+      if (!response) return null;
+
+      const cluster: AwsK8sClusterDto = {
+        id: clusterId,
+        clusterName: response.clusterName,
+        nodeCount: response.nodeCount,
+        nodeSize: response.nodeSize,
+        resourceConfigId: response.resourceConfigId,
+        ...(response.kubeConfig
+          ? { kubeConfig: JSON.stringify(response.kubeConfig) }
+          : {}),
+        ...(response.clusterEndpoint
+          ? { clusterEndpoint: JSON.stringify(response.clusterEndpoint) }
+          : {}),
+        ...(response.terraformState
+          ? { terraformState: JSON.stringify(response.terraformState) }
+          : {}),
+      };
+
+      return cluster;
     }
 
     if (provider === CloudProvider.AZURE) {
@@ -277,101 +413,558 @@ export class ProjectRequestService {
     return null;
   }
 
-  async DeployToAzureCluster(request: AddRepositoryToAzureClusterDto) {
-    // Check if repository exists
-    const repository = await this.databaseService.repository.findUnique({
-      where: { id: request.repositoryId },
-    });
-
-    if (!repository) {
-      throw new BadRequestException('Repository not found');
-    }
-
-    // Get image from gitlab
-    const project = await this.gitlabService.getProjectByName(
-      repository.name,
-    );
-    if (!project) {
-      throw new BadRequestException('Project not found in GitLab');
-    }
-
-    let projectDetail;
+  async DeployToK8sCluster(request: AddRepositoryToK8sClusterDto) {
     try {
-      projectDetail = await this.gitlabService.getImageFromRegistry(project.id);
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to get image from GitLab registry: ${error.message}`,
+      console.log(
+        'DeployToK8sCluster called with request:',
+        JSON.stringify(request, null, 2),
       );
+
+      // Check if repository exists
+      const repository = await this.databaseService.repository.findUnique({
+        where: { id: request.repositoryId },
+      });
+
+      if (!repository) {
+        throw new BadRequestException('Repository not found');
+      }
+
+      // Get image from gitlab
+      const project = await this.gitlabService.getProjectByName(
+        repository.name,
+      );
+      if (!project) {
+        throw new BadRequestException('Project not found in GitLab');
+      }
+
+      let projectDetail;
+      try {
+        projectDetail = await this.gitlabService.getImageFromRegistry(
+          project.id,
+        );
+      } catch (error) {
+        console.error('Error getting image from GitLab registry:', error);
+        throw new BadRequestException(
+          `Failed to get image from GitLab registry: ${error.message}`,
+        );
+      }
+
+      if (!projectDetail || !projectDetail.name || !projectDetail.image) {
+        throw new BadRequestException('No image found in GitLab registry');
+      }
+
+      let host = '';
+      // Get chosen cluster
+      if (request.provider === CloudProvider.AZURE) {
+        try {
+          const cluster = await this.databaseService.azureK8sCluster.findUnique(
+            {
+              where: { id: request.clusterId },
+            },
+          );
+
+          if (!cluster) {
+            throw new BadRequestException('Azure K8s Cluster not found');
+          }
+
+          if (!cluster.kubeConfig) {
+            throw new BadRequestException('Kubeconfig not found in cluster');
+          }
+
+          const kubeConfig = this.kubeconfigYamlToTypedObject(
+            cluster.kubeConfig,
+          );
+
+          // Register DNS record with Cloudflare
+          const clusterIp = cluster.clusterFqdn; // Extract the public IP from cluster FQDN
+          
+          if (!clusterIp) {
+            console.warn(`Cluster ${cluster.clusterName} has no FQDN/IP, skipping DNS registration`);
+          } else {
+            const clusterName = cluster.clusterName.trim().replace(/['"]/g, ''); // Remove any quotes
+            const wildcardDomain = `*.${clusterName}.orchestronic.dev`;
+            console.log(`Registering DNS: ${wildcardDomain} -> ${clusterIp}`);
+            try {
+              const dnsResult = await this.cloudflareService.upsertARecord({
+                fqdn: wildcardDomain,
+                ip: clusterIp,
+                proxied: false,
+                ttl: 1,
+              });
+            
+            if (dnsResult.action === 'created') {
+              console.log(`DNS record created for ${wildcardDomain} -> ${clusterIp}`);
+            } else if (dnsResult.action === 'updated') {
+              console.log(`DNS record updated for ${wildcardDomain} -> ${clusterIp}`);
+            } else {
+              console.log(`DNS record unchanged for ${wildcardDomain}`);
+            }
+            } catch (error) {
+              console.error('Failed to register DNS record with Cloudflare:', error);
+              // Continue with deployment even if DNS registration fails
+            }
+          }
+
+          // TODO: add kubeconfig to k8s automation service by cluster id
+          host = `${repository.name}.${cluster.clusterName}.orchestronic.dev`;
+          // Deploy into cluster
+          const deploymentRequest = new CreateClusterDeploymentRequestDto();
+          deploymentRequest.name = repository.name;
+          deploymentRequest.host = host;
+          deploymentRequest.image = projectDetail.image;
+          deploymentRequest.port = request.port;
+          deploymentRequest.usePrivateRegistry =
+            request.usePrivateRegistry ?? false;
+          deploymentRequest.kubeConfig = kubeConfig;
+
+          console.log('Deployment Request:', deploymentRequest);
+          const deploymentResponse =
+            await this.k8sAutomationService.automateK8sDeployment(
+              deploymentRequest,
+            );
+          if (!deploymentResponse || !deploymentResponse.success) {
+            console.error(
+              'Azure deployment failed:',
+              deploymentResponse?.message,
+            );
+            throw new BadRequestException(
+              'Failed to deploy to Azure K8s Cluster',
+            );
+          }
+
+          // Add resource to repository
+          const resourceConfig =
+            await this.databaseService.resourceConfig.findUnique({
+              where: { id: cluster.resourceConfigId },
+            });
+          if (!resourceConfig) {
+            throw new BadRequestException('Resource config not found');
+          }
+
+          const resource = await this.databaseService.resources.findFirst({
+            where: { resourceConfigId: resourceConfig.id },
+          });
+          if (!resource) {
+            throw new BadRequestException('Resource not found');
+          }
+
+          // Note: Not linking resourcesId directly to repository for K8s deployments
+          // as multiple repositories can share the same cluster resource.
+          // The ImageDeployment table properly tracks the repository-cluster relationship.
+
+          await this.databaseService.imageDeployment.create({
+            data: {
+              repositoryId: request.repositoryId,
+              AzureK8sClusterId: cluster.id,
+              hostedUrl: host,
+              imageUrl: projectDetail.image, // Add the appropriate image URL
+              DeploymentStatus: deployStatus.Deployed,
+            },
+          });
+
+          return host;
+        } catch (error) {
+          console.error('Error deploying to Azure K8s Cluster:', error);
+          console.error('Error stack:', error.stack);
+          throw new BadRequestException(
+            `Failed to deploy to Azure K8s Cluster: ${error.message}`,
+          );
+        }
+      }
+
+      if (request.provider === CloudProvider.AWS) {
+        try {
+          console.log('Deploying to AWS K8s Cluster', request.clusterId);
+          const cluster = await this.databaseService.awsK8sCluster.findUnique({
+            where: { id: request.clusterId },
+          });
+
+          if (!cluster) {
+            throw new BadRequestException('AWS K8s Cluster not found');
+          }
+          if (!cluster.kubeConfig) {
+            throw new BadRequestException('Kubeconfig not found in cluster');
+          }
+
+          const clusterEndpoint = cluster.clusterEndpoint;
+          if (!clusterEndpoint) {
+            throw new BadRequestException(
+              'Cluster endpoint not found in cluster',
+            );
+          }
+          const parsedEndpoint = JSON.parse(clusterEndpoint);
+
+          if (!parsedEndpoint.edge_public_ip) {
+            throw new BadRequestException(
+              'Edge public IP not found in cluster endpoint',
+            );
+          }
+          // Register DNS record with Cloudflare
+          const clusterIp = parsedEndpoint.edge_public_ip;
+          const clusterName = cluster.clusterName.trim().replace(/['"]/g, ''); // Remove any quotes
+          const wildcardDomain = `*.${clusterName}.orchestronic.dev`;
+          console.log(`Registering DNS: ${wildcardDomain} -> ${clusterIp}`);
+          try {
+            const dnsResult = await this.cloudflareService.upsertARecord({
+              fqdn: wildcardDomain,
+              ip: clusterIp,
+              proxied: false,
+              ttl: 1,
+            });
+            
+            if (dnsResult.action === 'created') {
+              console.log(`DNS record created for ${wildcardDomain} -> ${clusterIp}`);
+            } else if (dnsResult.action === 'updated') {
+              console.log(`DNS record updated for ${wildcardDomain} -> ${clusterIp}`);
+            } else {
+              console.log(`DNS record unchanged for ${wildcardDomain}`);
+            }
+          } catch (error) {
+            console.error('Failed to register DNS record with Cloudflare:', error);
+            // Continue with deployment even if DNS registration fails
+          }
+
+          // TODO: add kubeconfig to k8s automation service by cluster id
+          const kubeConfigObject = this.kubeconfigYamlToTypedObject(
+            cluster.kubeConfig,
+          );
+          host = `${repository.name}.${clusterName}.orchestronic.dev`;
+          // Deploy into cluster
+          const deploymentRequest = new CreateClusterDeploymentRequestDto();
+          deploymentRequest.name = repository.name;
+          deploymentRequest.host = host;
+          deploymentRequest.image = projectDetail.image;
+          deploymentRequest.port = request.port;
+          deploymentRequest.usePrivateRegistry =
+            request.usePrivateRegistry ?? false;
+          deploymentRequest.kubeConfig = kubeConfigObject;
+
+          console.log('Deployment Request:', deploymentRequest);
+          const deploymentResponse =
+            await this.k8sAutomationService.automateK8sDeployment(
+              deploymentRequest,
+            );
+          if (!deploymentResponse || !deploymentResponse.success) {
+            console.error(
+              'AWS deployment failed:',
+              deploymentResponse?.message,
+            );
+            throw new BadRequestException(
+              'Failed to deploy to AWS K8s Cluster',
+            );
+          }
+
+          // Add resource to repository
+          const resourceConfig =
+            await this.databaseService.resourceConfig.findUnique({
+              where: { id: cluster.resourceConfigId },
+            });
+          if (!resourceConfig) {
+            throw new BadRequestException('Resource config not found');
+          }
+
+          const resource = await this.databaseService.resources.findFirst({
+            where: { resourceConfigId: resourceConfig.id },
+          });
+          if (!resource) {
+            throw new BadRequestException('Resource not found');
+          }
+
+          // Note: Not linking resourcesId directly to repository for K8s deployments
+          // as multiple repositories can share the same cluster resource.
+          // The ImageDeployment table properly tracks the repository-cluster relationship.
+
+          await this.databaseService.imageDeployment.create({
+            data: {
+              repositoryId: request.repositoryId,
+              AwsK8sClusterId: cluster.id,
+              hostedUrl: host,
+              imageUrl: projectDetail.image, // Add the appropriate image URL
+              DeploymentStatus: deployStatus.Deployed,
+            },
+          });
+
+          return host;
+        } catch (error) {
+          console.error('Error deploying to AWS K8s Cluster:', error);
+          console.error('Error stack:', error.stack);
+          throw new BadRequestException(
+            `Failed to deploy to AWS K8s Cluster: ${error.message}`,
+          );
+        }
+      }
+    } catch (error) {
+      console.error('=== DeployToK8sCluster Error ===');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error(
+        'Full error:',
+        JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+      );
+      console.error('================================');
+      throw error;
     }
+  }
 
-    if (!projectDetail || !projectDetail.name || !projectDetail.image) {
-      throw new BadRequestException('No image found in GitLab registry');
-    }
+  async updateDeployToAzureCluster() {}
 
-    // Get chosen cluster
-    const cluster = await this.databaseService.azureK8sCluster.findUnique({
-      where: { id: request.clusterId },
-    });
-
-    if (!cluster) {
-      throw new BadRequestException('Azure K8s Cluster not found');
-    }
-
-    // TODO: add kubeconfig to k8s automation service by cluster id
-    const kubeConfig = cluster.kubeConfig;
-    if (!kubeConfig) {
-      throw new BadRequestException('Kubeconfig not found in cluster');
-    }
-
-    // Deploy into cluster
-    const deploymentRequest = new CreateClusterDeploymentRequestDto();
-    deploymentRequest.name = projectDetail.name;
-    deploymentRequest.image = projectDetail.image;
-    deploymentRequest.port = request.port;
-    deploymentRequest.usePrivateRegistry =
-      request.usePrivateRegistry ?? undefined;
-    deploymentRequest.kubeConfig = kubeConfig;
-
-    const deploymentResponse =
-      await this.k8sAutomationService.automateK8sDeployment(deploymentRequest);
-    if (!deploymentResponse || !deploymentResponse.success) {
-      throw new BadRequestException('Failed to deploy to Azure K8s Cluster');
-    }
-
-    // Add resource to repository
-    const resourceConfig = await this.databaseService.resourceConfig.findUnique(
-      {
-        where: { id: cluster.resourceConfigId },
+  async findClustersByUserId(req: BackendJwtPayload) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        ownerId: req.id,
       },
-    );
-    if (!resourceConfig) {
-      throw new BadRequestException('Resource config not found');
-    }
-
-    const resource = await this.databaseService.resources.findFirst({
-      where: { resourceConfigId: resourceConfig.id },
     });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return await Promise.all(
+      resources.map(async (resource) => {
+        const clusters = await this.findClusterResourceConfigById(resource.id);
+        const firstCluster = clusters?.[0];
+        return {
+          clusterRequestId: resource.id,
+          id: firstCluster?.id || '',
+          name: firstCluster?.clusterName || '',
+          region: resource.region,
+          resourceConfigId: resource.resourceConfigId,
+          cloudProvider: resource.cloudProvider,
+        };
+      }),
+    );
+  }
+
+  async findClustersByUserIdAndStatus(req: BackendJwtPayload, status: Status) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        ownerId: req.id,
+        status: status,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return resources;
+  }
+
+  async findAllPendingClusters() {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        status: Status.Pending,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return clusterRequests.map((cr) => ({
+      clusterRequestId: cr.id,
+      ...resources.find((r) => r.id === cr.resourceId),
+    }));
+  }
+
+  async findAllApprovedClusters() {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        status: Status.Approved,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return await Promise.all(
+      resources.map(async (resource) => {
+        const clusters = await this.findClusterResourceConfigById(resource.id);
+        const firstCluster = clusters?.[0];
+        return {
+          clusterRequestId: resource.id,
+          id: firstCluster?.id || '',
+          name: firstCluster?.clusterName || '',
+          region: resource.region,
+          resourceConfigId: resource.resourceConfigId,
+          cloudProvider: resource.cloudProvider,
+        };
+      }),
+    );
+  }
+
+  async findAllApprovedClustersByUserId(req: BackendJwtPayload) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        ownerId: req.id,
+        status: Status.Approved,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return await Promise.all(
+      resources.map(async (resource) => {
+        const clusters = await this.findClusterResourceConfigById(resource.id);
+        const firstCluster = clusters?.[0];
+        return {
+          clusterRequestId: resource.id,
+          id: firstCluster?.id || '',
+          name: firstCluster?.clusterName || '',
+          region: resource.region,
+          resourceConfigId: resource.resourceConfigId,
+          cloudProvider: resource.cloudProvider,
+        };
+      }),
+    );
+  }
+
+  async findAllClustersWithStatus(status: Status) {
+    const clusterRequests = await this.databaseService.clusterRequest.findMany({
+      where: {
+        status: status,
+      },
+    });
+
+    const resourceIds = clusterRequests.map((cr) => cr.resourceId);
+
+    const resources = await this.databaseService.resources.findMany({
+      where: {
+        id: { in: resourceIds },
+      },
+    });
+
+    return clusterRequests.map((cr) => ({
+      clusterRequestId: cr.id,
+      ...resources.find((r) => r.id === cr.resourceId),
+    }));
+  }
+
+  async findClusterResourcesById(clusterId: string) {
+    const resource = await this.databaseService.resources.findUnique({
+      where: { id: clusterId },
+    });
+
     if (!resource) {
       throw new BadRequestException('Resource not found');
     }
 
-    // Add repository to cluster
-    const response = await this.databaseService.repository.update({
-      where: { id: request.repositoryId },
-      data: {
-        resourcesId: resource.id,
-      },
+    return resource;
+  }
+
+  async findClusterResourceConfigById(clusterId: string) {
+    const resource = await this.databaseService.resources.findUnique({
+      where: { id: clusterId },
     });
 
-    await this.databaseService.imageDeployment.create({
-      data: {
-        repositoryId: request.repositoryId,
-        AzureK8sClusterId: cluster.id,
-        imageUrl: projectDetail.image, // Add the appropriate image URL
-        DeploymentStatus: deployStatus.Deployed,
+    if (resource?.cloudProvider === CloudProvider.AWS) {
+      const resourceConfig =
+        await this.databaseService.resourceConfig.findUnique({
+          where: { id: resource?.resourceConfigId },
+        });
+
+      const cluster = await this.databaseService.awsK8sCluster.findMany({
+        where: { resourceConfigId: resourceConfig?.id },
+      });
+
+      if (!cluster) {
+        throw new BadRequestException('Resource config not found');
+      }
+
+      return cluster;
+    }
+
+    if (resource?.cloudProvider === CloudProvider.AZURE) {
+      const resourceConfig =
+        await this.databaseService.resourceConfig.findUnique({
+          where: { id: resource?.resourceConfigId },
+        });
+
+      const cluster = await this.databaseService.azureK8sCluster.findMany({
+        where: { resourceConfigId: resourceConfig?.id },
+      });
+
+      if (!cluster) {
+        throw new BadRequestException('Resource config not found');
+      }
+
+      return cluster;
+    }
+  }
+
+  async findClusterRequestsByReqId(requestId: string) {
+    const clusterRequest = await this.databaseService.clusterRequest.findUnique(
+      {
+        where: { id: requestId },
       },
+    );
+
+    if (!clusterRequest) {
+      throw new BadRequestException('Cluster request not found');
+    }
+
+    return clusterRequest;
+  }
+
+  async findAllClusterRequests() {
+    const clusterRequests =
+      await this.databaseService.clusterRequest.findMany();
+
+    if (!clusterRequests || clusterRequests.length === 0) {
+      throw new BadRequestException('No cluster requests found');
+    }
+
+    return clusterRequests;
+  }
+
+  async findResourceConfigById(resourceConfigId: string) {
+    const resourceConfig = await this.databaseService.resourceConfig.findMany({
+      where: { id: resourceConfigId },
     });
 
-    return response;
+    if (!resourceConfig) {
+      throw new BadRequestException('Resource config not found');
+    }
+
+    return resourceConfig;
+  }
+
+  async findImageDeploymentsByRepoId(repositoryId: string) {
+    const imageDeployments =
+      await this.databaseService.imageDeployment.findFirst({
+        where: { repositoryId: repositoryId },
+      });
+
+    if (!imageDeployments) {
+      throw new BadRequestException('No image deployments found');
+    }
+    return imageDeployments;
+  }
+
+  private kubeconfigYamlToTypedObject(yamlText: string): KubeConfig {
+    return parseYaml(yamlText) as KubeConfig;
   }
 }

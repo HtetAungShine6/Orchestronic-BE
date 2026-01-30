@@ -1,12 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { CloudProvider } from '@prisma/client';
 import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
 
-export class AddRepositoryToAzureClusterDto {
+export class AddRepositoryToK8sClusterDto {
   @IsString()
   @ApiProperty({
     example: 'uuid-of-cluster',
   })
   clusterId: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'azure',
+  })
+  provider: CloudProvider;
 
   @IsString()
   @ApiProperty({
@@ -16,7 +23,7 @@ export class AddRepositoryToAzureClusterDto {
 
   @IsNumber()
   @ApiProperty({
-    example: 3000,
+    example: 80,
   })
   port: number;
 

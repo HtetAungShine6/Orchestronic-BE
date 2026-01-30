@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   Param,
   Get,
+  Query,
 } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
 import { AirflowService } from './airflow.service';
@@ -61,10 +62,10 @@ export class AirflowController {
         };
       }
 
-      // 1️⃣ Try to find a failed task first
+      // Try to find a failed task first
       const failedTask = tasks.find((t) => t.state === 'failed');
 
-      // 2️⃣ Otherwise pick running / queued / last
+      // Otherwise pick running / queued / last
       const targetTask =
         failedTask ||
         tasks.find((t) => t.state === 'running') ||
@@ -73,7 +74,7 @@ export class AirflowController {
 
       const taskId = targetTask.task_id;
 
-      // 3️⃣ Fetch logs for that task
+      // Fetch logs for that task
       const logs = await this.airflowService.getTaskLogs(
         dagId,
         dagRunId,
@@ -93,5 +94,28 @@ export class AirflowController {
     @Param('dagRunId') dagRunId: string,
   ) {
     return this.airflowService.getTaskInstances(dagId, dagRunId);
+  }
+
+  @Get('worker/logs')
+  @ApiOperation({
+    summary: 'Get Airflow worker logs',
+    description:
+      'Fetches event logs from Airflow workers showing system events and task execution history.',
+  })
+  getWorkerLogs() {
+    return this.airflowService.getWorkerLogs();
+  }
+
+  @Get('/airflow/dags')
+  getDags(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+    return this.airflowService.getAllDags(
+      Number(limit ?? 100),
+      Number(offset ?? 0),
+    );
+  }
+
+  @Get('cluster-creation/logs')
+  async getOrchestronicLogs() {
+    return this.airflowService.getOrchestronicSelectedLogs();
   }
 }
