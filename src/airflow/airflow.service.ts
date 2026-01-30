@@ -204,7 +204,9 @@ export class AirflowService {
       }),
     );
 
-    return resp.data?.dag_runs?.[0]?.dag_run_id ?? null;
+    return resp.data.dag_runs.length > 0
+      ? resp.data.dag_runs[0].dag_run_id
+      : null;
   }
 
   async getTaskInstanceById(dagId: string, dagRunId: string, taskId: string) {
