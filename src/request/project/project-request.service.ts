@@ -481,7 +481,9 @@ export class ProjectRequestService {
           if (!clusterIp) {
             console.warn(`Cluster ${cluster.clusterName} has no FQDN/IP, skipping DNS registration`);
           } else {
-            const wildcardDomain = `*.${cluster.clusterName}.orchestronic.dev`;
+            const clusterName = cluster.clusterName.trim().replace(/['"]/g, ''); // Remove any quotes
+            const wildcardDomain = `*.${clusterName}.orchestronic.dev`;
+            console.log(`Registering DNS: ${wildcardDomain} -> ${clusterIp}`);
             try {
               const dnsResult = await this.cloudflareService.upsertARecord({
                 fqdn: wildcardDomain,
@@ -599,7 +601,9 @@ export class ProjectRequestService {
           }
           // Register DNS record with Cloudflare
           const clusterIp = parsedEndpoint.edge_public_ip;
-          const wildcardDomain = `*.${cluster.clusterName}.orchestronic.dev`;
+          const clusterName = cluster.clusterName.trim().replace(/['"]/g, ''); // Remove any quotes
+          const wildcardDomain = `*.${clusterName}.orchestronic.dev`;
+          console.log(`Registering DNS: ${wildcardDomain} -> ${clusterIp}`);
           try {
             const dnsResult = await this.cloudflareService.upsertARecord({
               fqdn: wildcardDomain,
@@ -611,7 +615,9 @@ export class ProjectRequestService {
             if (dnsResult.action === 'created') {
               console.log(`DNS record created for ${wildcardDomain} -> ${clusterIp}`);
             } else if (dnsResult.action === 'updated') {
-              console.log(`DNS record already exist for ${wildcardDomain} -> ${clusterIp}`);
+              console.log(`DNS record updated for ${wildcardDomain} -> ${clusterIp}`);
+            } else {
+              console.log(`DNS record unchanged for ${wildcardDomain}`);
             }
           } catch (error) {
             console.error('Failed to register DNS record with Cloudflare:', error);
@@ -622,7 +628,7 @@ export class ProjectRequestService {
           const kubeConfigObject = this.kubeconfigYamlToTypedObject(
             cluster.kubeConfig,
           );
-          host = `${repository.name}.${cluster.clusterName}.orchestronic.dev`;
+          host = `${repository.name}.${clusterName}.orchestronic.dev`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = repository.name;
