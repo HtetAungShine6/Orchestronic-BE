@@ -23,7 +23,7 @@
         },
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "$FRONTEND_URL"
+          "value": "https://orchestronic-fe.vercel.app"
         },
         {
           "key": "Access-Control-Allow-Methods",
