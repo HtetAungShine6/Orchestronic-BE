@@ -492,8 +492,10 @@ export class ProjectRequestService {
             
             if (dnsResult.action === 'created') {
               console.log(`DNS record created for ${wildcardDomain} -> ${clusterIp}`);
-            } else if (dnsResult.action === 'found') {
-              console.log(`DNS record already exists for ${wildcardDomain}, skipping registration`);
+            } else if (dnsResult.action === 'updated') {
+              console.log(`DNS record updated for ${wildcardDomain} -> ${clusterIp}`);
+            } else {
+              console.log(`DNS record unchanged for ${wildcardDomain}`);
             }
             } catch (error) {
               console.error('Failed to register DNS record with Cloudflare:', error);
