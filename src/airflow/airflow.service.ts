@@ -175,7 +175,10 @@ export class AirflowService {
 
       const resp = await firstValueFrom(response$);
 
-      return resp.data;
+      return {
+        success: true,
+        message: resp.data
+      };
     } catch (err: any) {
       throw new HttpException(
         {

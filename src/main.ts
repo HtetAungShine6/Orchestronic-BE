@@ -9,7 +9,7 @@ import session from 'express-session';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.use(cookieParser()); // 👈 add this
+  app.use(cookieParser());
   app.setGlobalPrefix('api');
 
   app.use(
@@ -17,13 +17,13 @@ async function bootstrap() {
       secret: process.env.SESSION_SECRET || 'supersecret',
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: false }, // true if HTTPS
+      cookie: { secure: false },
     }),
   );
 
   app.enableCors({
     origin: process.env.FRONTEND_URL,
-    credentials: true, // allow cookies
+    credentials: true, 
   });
 
   app.useGlobalPipes(new ValidationPipe());
@@ -59,15 +59,6 @@ async function bootstrap() {
     ],
   });
 
-  // app.connectMicroservice<MicroserviceOptions>({
-  //   transport: Transport.RMQ,
-  //   options: {
-  //     urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
-  //     queue: 'request',
-  //   },
-  // });
-
-  // await app.startAllMicroservices();
   await app.listen(process.env.PORT ?? 3001);
 }
 bootstrap();
