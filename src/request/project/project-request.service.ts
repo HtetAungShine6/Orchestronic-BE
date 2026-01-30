@@ -610,7 +610,7 @@ export class ProjectRequestService {
             
             if (dnsResult.action === 'created') {
               console.log(`DNS record created for ${wildcardDomain} -> ${clusterIp}`);
-            } else if (dnsResult.action === 'found') {
+            } else if (dnsResult.action === 'updated') {
               console.log(`DNS record already exist for ${wildcardDomain} -> ${clusterIp}`);
             }
           } catch (error) {
@@ -622,7 +622,7 @@ export class ProjectRequestService {
           const kubeConfigObject = this.kubeconfigYamlToTypedObject(
             cluster.kubeConfig,
           );
-          host = `${repository.name}.${cluster.clusterName}.${parsedEndpoint.edge_public_ip}.nip.io`;
+          host = `${repository.name}.${cluster.clusterName}.orchestronic.dev`;
           // Deploy into cluster
           const deploymentRequest = new CreateClusterDeploymentRequestDto();
           deploymentRequest.name = repository.name;
