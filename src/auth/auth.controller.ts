@@ -74,8 +74,8 @@ export class AuthController {
       // Set cookies with proper configuration
       const cookieOptions = {
         httpOnly: true,
-        secure: isProd,
-        sameSite: isProd ? ('none' as const) : ('lax' as const),
+        secure: true, // Always true for production cross-origin cookies
+        sameSite: 'none' as const, // Required for cross-origin cookies
         path: '/',
       };
 
@@ -89,7 +89,9 @@ export class AuthController {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
-      console.log('Cookies set successfully, redirecting to dashboard');
+      console.log('Cookies set successfully');
+      console.log('Redirecting to:', `${process.env.FRONTEND_URL}/dashboard`);
+      console.log('Cookie options:', cookieOptions);
 
       // Redirect to frontend dashboard
       return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
