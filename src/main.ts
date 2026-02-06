@@ -4,8 +4,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 // import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { ValidationPipe } from '@nestjs/common';
 // import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import * as cookieParser from 'cookie-parser';
-import * as session from 'express-session';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -23,7 +23,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.FRONTEND_URL,
-    credentials: true, 
+    credentials: true,
   });
 
   app.useGlobalPipes(new ValidationPipe());
