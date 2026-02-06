@@ -2,22 +2,19 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
-import { ExpressAdapter } from '@nestjs/platform-express';
+import { INestApplication } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import express, { Express, Request, Response } from 'express';
+import { Request, Response } from 'express';
 
-let cachedApp: Express;
+let cachedServer: any;
 
-async function createApp(): Promise<Express> {
-  if (cachedApp) {
-    return cachedApp;
+async function createApp(): Promise<INestApplication> {
+  if (cachedServer) {
+    return cachedServer;
   }
 
-  const expressApp = express();
-  const adapter = new ExpressAdapter(expressApp);
-
-  const app = await NestFactory.create(AppModule, adapter);
+  const app = await NestFactory.create(AppModule);
 
   app.use(cookieParser());
   app.setGlobalPrefix('api');
@@ -73,14 +70,15 @@ async function createApp(): Promise<Express> {
 
   await app.init();
 
-  cachedApp = expressApp;
-  return expressApp;
+  cachedServer = app;
+  return app;
 }
 
 // For Vercel serverless
 export default async (req: Request, res: Response) => {
   const app = await createApp();
-  app(req, res);
+  const expressInstance = app.getHttpAdapter().getInstance();
+  expressInstance(req, res);
 };
 
 // For local development
@@ -88,9 +86,8 @@ if (require.main === module) {
   async function bootstrap() {
     const app = await createApp();
     const port = process.env.PORT ?? 3001;
-    app.listen(port, () => {
-      console.log(`Application is running on: http://localhost:${port}`);
-    });
+    await app.listen(port);
+    console.log(`Application is running on: http://localhost:${port}`);
   }
   bootstrap();
 }
