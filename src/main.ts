@@ -1,14 +1,24 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-// import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { ValidationPipe } from '@nestjs/common';
-// import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ExpressAdapter } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import express, { Express, Request, Response } from 'express';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+let cachedApp: Express;
+
+async function createApp(): Promise<Express> {
+  if (cachedApp) {
+    return cachedApp;
+  }
+
+  const expressApp = express();
+  const adapter = new ExpressAdapter(expressApp);
+
+  const app = await NestFactory.create(AppModule, adapter);
+
   app.use(cookieParser());
   app.setGlobalPrefix('api');
 
@@ -17,7 +27,10 @@ async function bootstrap() {
       secret: process.env.SESSION_SECRET || 'supersecret',
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: false },
+      cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      },
     }),
   );
 
@@ -27,7 +40,6 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(new ValidationPipe());
-  // app.useGlobalInterceptors(new TransformInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle('Orchestronic API')
@@ -59,6 +71,26 @@ async function bootstrap() {
     ],
   });
 
-  await app.listen(process.env.PORT ?? 3001);
+  await app.init();
+
+  cachedApp = expressApp;
+  return expressApp;
 }
-bootstrap();
+
+// For Vercel serverless
+export default async (req: Request, res: Response) => {
+  const app = await createApp();
+  app(req, res);
+};
+
+// For local development
+if (require.main === module) {
+  async function bootstrap() {
+    const app = await createApp();
+    const port = process.env.PORT ?? 3001;
+    app.listen(port, () => {
+      console.log(`Application is running on: http://localhost:${port}`);
+    });
+  }
+  bootstrap();
+}

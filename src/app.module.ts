@@ -86,7 +86,7 @@ import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
           urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
           queue: 'destroyK8s',
         },
-      }
+      },
     ]),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'swagger-static'),
@@ -102,6 +102,14 @@ import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
       database: process.env.POSTGRES_DATABASE,
       autoLoadEntities: true,
       synchronize: true,
+      // Serverless optimized connection pool settings
+      extra: {
+        max: 2, // Maximum number of connections in the pool (low for serverless)
+        connectionTimeoutMillis: 5000,
+        idleTimeoutMillis: 10000,
+      },
+      // Disable connection pooling for serverless
+      poolSize: 2,
     }),
     ScheduleModule.forRoot(),
     RequestModule,
