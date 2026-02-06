@@ -7,8 +7,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from './database/database.module';
 import { UserController } from './user/user.controller';
 import { UserModule } from './user/user.module';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 import { RepositoriesModule } from './repositories/repositories.module';
 import { RepositoriesController } from './repositories/repositories.controller';
 import { RepositoriesService } from './repositories/repositories.service';
@@ -88,10 +86,6 @@ import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
         },
       },
     ]),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'swagger-static'),
-      serveRoot: process.env.NODE_ENV === 'development' ? '/' : '/swagger',
-    }),
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'postgres',
