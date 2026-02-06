@@ -38,12 +38,22 @@ export class AuthController {
   @Get('azure')
   @UseGuards(AuthGuard('azure-ad'))
   async azureLogin() {
+    console.log('🚀 Azure login initiated');
+    console.log('🔧 AZURE_AD_REDIRECT_URI:', process.env.AZURE_AD_REDIRECT_URI);
+    console.log(
+      '🔧 AZURE_AD_CLIENT_ID:',
+      process.env.AZURE_AD_CLIENT_ID?.substring(0, 8) + '...',
+    );
     // passport redirect to Azure
   }
 
   @Get('azure/callback')
   @UseGuards(AuthGuard('azure-ad'))
   azureCallback(@Req() req, @Res() res: Response) {
+    console.log('🔙 Azure callback received');
+    console.log('🔗 Full URL:', req.url);
+    console.log('🔍 Query params:', req.query);
+
     const isProd = process.env.NODE_ENV === 'production';
 
     try {
