@@ -8,14 +8,18 @@ import { Role } from '@prisma/client';
 @Injectable()
 export class AzureStrategy extends PassportStrategy(OIDCStrategy, 'azure-ad') {
   constructor(private readonly databaseService: DatabaseService) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const redirectUrl = process.env.AZURE_AD_REDIRECT_URI;
+
     const config = {
       identityMetadata: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0/.well-known/openid-configuration`,
       clientID: process.env.AZURE_AD_CLIENT_ID,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
       responseType: 'code',
       responseMode: 'query',
-      redirectUrl: process.env.AZURE_AD_REDIRECT_URI,
-      allowHttpForRedirectUrl: false, // Should be false in production
+      redirectUrl: redirectUrl,
+      allowHttpForRedirectUrl:
+        !isProduction || redirectUrl?.startsWith('http://'), // Allow HTTP in dev or if explicitly using HTTP
       passReqToCallback: false,
       scope: ['profile', 'email', 'openid'],
       prompt: 'select_account',
@@ -25,6 +29,10 @@ export class AzureStrategy extends PassportStrategy(OIDCStrategy, 'azure-ad') {
 
     console.log('🔧 Azure Strategy initialized with config:');
     console.log(
+      '   - Environment:',
+      isProduction ? 'production' : 'development',
+    );
+    console.log(
       '   - Tenant ID:',
       process.env.AZURE_AD_TENANT_ID?.substring(0, 8) + '...',
     );
@@ -32,7 +40,8 @@ export class AzureStrategy extends PassportStrategy(OIDCStrategy, 'azure-ad') {
       '   - Client ID:',
       process.env.AZURE_AD_CLIENT_ID?.substring(0, 8) + '...',
     );
-    console.log('   - Redirect URI:', process.env.AZURE_AD_REDIRECT_URI);
+    console.log('   - Redirect URI:', redirectUrl);
+    console.log('   - Allow HTTP:', config.allowHttpForRedirectUrl);
 
     super(config);
   }
