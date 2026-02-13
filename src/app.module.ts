@@ -35,6 +35,47 @@ import { K8sAutomationModule } from './k8sautomation/k8sautomation.module';
 import { K8sAutomationService } from './k8sautomation/k8sautomation.service';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
 
+const isServerless = process.env.VERCEL === '1';
+
+const rabbitMQModules = isServerless
+  ? []
+  : [
+      ClientsModule.register([
+        {
+          name: 'RABBITMQ_SERVICE_1',
+          transport: Transport.RMQ,
+          options: {
+            urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+            queue: 'request',
+          },
+        },
+        {
+          name: 'RABBITMQ_SERVICE_2',
+          transport: Transport.RMQ,
+          options: {
+            urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+            queue: 'destroy',
+          },
+        },
+        {
+          name: 'RABBITMQ_SERVICE_3',
+          transport: Transport.RMQ,
+          options: {
+            urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+            queue: 'resource',
+          },
+        },
+        {
+          name: 'RABBITMQ_SERVICE_4',
+          transport: Transport.RMQ,
+          options: {
+            urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
+            queue: 'destroyK8s',
+          },
+        },
+      ]),
+    ];
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -52,40 +93,7 @@ import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
       }),
     }),
 
-    ClientsModule.register([
-      {
-        name: 'RABBITMQ_SERVICE_1',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
-          queue: 'request',
-        },
-      },
-      {
-        name: 'RABBITMQ_SERVICE_2',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
-          queue: 'destroy',
-        },
-      },
-      {
-        name: 'RABBITMQ_SERVICE_3',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
-          queue: 'resource',
-        },
-      },
-      {
-        name: 'RABBITMQ_SERVICE_4',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://airflow:airflow@20.2.248.253:5672'],
-          queue: 'destroyK8s',
-        },
-      },
-    ]),
+    ...rabbitMQModules,
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'postgres',
