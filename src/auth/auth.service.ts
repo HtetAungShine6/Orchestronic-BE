@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { Role } from '@prisma/client';
 import * as crypto from 'crypto';
-
+// Please work
 @Injectable()
 export class AuthService {
   constructor(private readonly databaseService: DatabaseService) {}
