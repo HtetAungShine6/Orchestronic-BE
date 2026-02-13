@@ -1,13 +1,24 @@
-import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { BackendJwtPayload, RequestWithCookies } from '../lib/types';
 import * as jwt from 'jsonwebtoken';
+import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private jwt: JwtService) {}
+  constructor(
+    private jwt: JwtService,
+    private authService: AuthService,
+  ) {}
 
   @Get('test-login')
   testLogin(@Res() res: Response) {
@@ -36,38 +47,110 @@ export class AuthController {
   }
 
   @Get('azure')
-  @UseGuards(AuthGuard('azure-ad'))
-  async azureLogin() {
+  async azureLogin(@Res() res: Response) {
     console.log('🚀 Azure login initiated');
-    console.log('🔧 AZURE_AD_REDIRECT_URI:', process.env.AZURE_AD_REDIRECT_URI);
-    console.log(
-      '🔧 AZURE_AD_CLIENT_ID:',
-      process.env.AZURE_AD_CLIENT_ID?.substring(0, 8) + '...',
-    );
-    // passport redirect to Azure
+
+    // Generate state and sign it
+    const state = this.authService.generateState();
+    const stateSig = this.authService.signState(state);
+
+    // Store state in a short-lived cookie (survives serverless invocations)
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 5 * 60 * 1000, // 5 minutes
+      path: '/',
+    });
+    res.cookie('oauth_state_sig', stateSig, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 5 * 60 * 1000,
+      path: '/',
+    });
+
+    const authUrl = this.authService.getAuthorizationUrl(state);
+    console.log('Redirecting to Azure AD:', authUrl.substring(0, 100) + '...');
+    return res.redirect(authUrl);
   }
 
   @Get('azure/callback')
-  @UseGuards(AuthGuard('azure-ad'))
-  azureCallback(@Req() req, @Res() res: Response) {
+  async azureCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error: string,
+    @Query('error_description') errorDescription: string,
+    @Req() req,
+    @Res() res: Response,
+  ) {
     console.log('🔙 Azure callback received');
-    console.log('🔗 Full URL:', req.url);
-    console.log('🔍 Query params:', req.query);
-
     const isProd = process.env.NODE_ENV === 'production';
 
-    try {
-      console.log('Azure callback - Req.user:', req.user);
-      const user = req.user;
+    // Clear the state cookies
+    const cookieClearOpts = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+      path: '/',
+    };
 
-      if (!user || !user.id || !user.email) {
-        console.error('Invalid user data from Azure AD:', user);
+    try {
+      // Check for Azure AD errors
+      if (error) {
+        console.error('Azure AD error:', error, errorDescription);
+        res.clearCookie('oauth_state', cookieClearOpts);
+        res.clearCookie('oauth_state_sig', cookieClearOpts);
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=${error}`);
+      }
+
+      // Verify state to prevent CSRF
+      const savedState = req.cookies?.oauth_state;
+      const savedStateSig = req.cookies?.oauth_state_sig;
+
+      if (!savedState || !savedStateSig) {
+        console.error('No state cookie found');
         return res.redirect(
-          `${process.env.FRONTEND_URL}/login?error=invalid_user`,
+          `${process.env.FRONTEND_URL}/login?error=missing_state`,
         );
       }
 
-      // Create JWT payload with all required fields
+      if (
+        state !== savedState ||
+        !this.authService.verifyState(savedState, savedStateSig)
+      ) {
+        console.error('State mismatch or invalid signature');
+        res.clearCookie('oauth_state', cookieClearOpts);
+        res.clearCookie('oauth_state_sig', cookieClearOpts);
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/login?error=invalid_state`,
+        );
+      }
+
+      // Clear state cookies
+      res.clearCookie('oauth_state', cookieClearOpts);
+      res.clearCookie('oauth_state_sig', cookieClearOpts);
+
+      // Exchange code for tokens
+      const tokens = await this.authService.exchangeCodeForTokens(code);
+      const profile = this.authService.decodeIdToken(tokens.id_token);
+
+      console.log('Profile from Azure AD:', profile.preferred_username);
+
+      const email = profile.preferred_username || profile.email;
+      if (!email) {
+        console.error('No email found in profile');
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=no_email`);
+      }
+
+      // Find or create user
+      const user = await this.authService.findOrCreateUser({
+        email,
+        name: profile.name || email,
+      });
+
+      // Create JWT payload
       const jwtPayload = {
         id: user.id,
         email: user.email,
@@ -75,38 +158,34 @@ export class AuthController {
         role: user.role,
       };
 
-      // Issue short-lived access token
+      // Issue tokens
       const accessToken = this.jwt.sign(jwtPayload, { expiresIn: '1h' });
-
-      // Issue refresh token
       const refreshToken = this.jwt.sign({ id: user.id }, { expiresIn: '7d' });
 
-      // Set cookies with proper configuration
+      // Set cookies
       const cookieOptions = {
         httpOnly: true,
-        secure: true, // Always true for production cross-origin cookies
-        sameSite: 'none' as const, // Required for cross-origin cookies
+        secure: true,
+        sameSite: 'none' as const,
         path: '/',
       };
 
       res.cookie('access_token', accessToken, {
         ...cookieOptions,
-        maxAge: 60 * 60 * 1000, // 1 hour
+        maxAge: 60 * 60 * 1000,
       });
 
       res.cookie('refresh_token', refreshToken, {
         ...cookieOptions,
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
-      console.log('Cookies set successfully');
-      console.log('Redirecting to:', `${process.env.FRONTEND_URL}/dashboard`);
-      console.log('Cookie options:', cookieOptions);
-
-      // Redirect to frontend dashboard
+      console.log('Login successful, redirecting to dashboard');
       return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
-    } catch (error) {
-      console.error('Error in Azure callback:', error);
+    } catch (err) {
+      console.error('Error in Azure callback:', err);
+      res.clearCookie('oauth_state', cookieClearOpts);
+      res.clearCookie('oauth_state_sig', cookieClearOpts);
       return res.redirect(
         `${process.env.FRONTEND_URL}/login?error=auth_failed`,
       );

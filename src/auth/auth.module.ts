@@ -5,13 +5,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { DatabaseService } from '../database/database.service';
 import { AuthController } from './auth.controller';
 import { PassportModule } from '@nestjs/passport';
-import { AzureStrategy } from './strategies/azure-ad.strategy';
+import { AuthService } from './auth.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     PassportModule.register({
-      defaultStrategy: 'azure-ad',
+      defaultStrategy: 'jwt',
     }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -23,7 +23,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
     UserModule,
   ],
-  providers: [JwtStrategy, DatabaseService, AzureStrategy],
+  providers: [JwtStrategy, DatabaseService, AuthService],
   controllers: [AuthController],
   exports: [JwtStrategy],
 })
