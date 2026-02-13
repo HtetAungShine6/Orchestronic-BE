@@ -5,25 +5,20 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { DatabaseService } from '../database/database.service';
 import { AuthController } from './auth.controller';
 import { PassportModule } from '@nestjs/passport';
-import { AuthService } from './auth.service';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AzureStrategy } from './strategies/azure-ad.strategy';
 
 @Module({
   imports: [
     PassportModule.register({
-      defaultStrategy: 'jwt',
+      defaultStrategy: 'azure-ad',
     }),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
-      }),
+    JwtModule.register({
+      secret: 'eSo3PoOYP7BhJFaqfnsKz52mo3cpV1vb3M38IGzaFt4=',
+      signOptions: { expiresIn: '1h' },
     }),
     UserModule,
   ],
-  providers: [JwtStrategy, DatabaseService, AuthService],
+  providers: [JwtStrategy, DatabaseService, AzureStrategy],
   controllers: [AuthController],
   exports: [JwtStrategy],
 })
