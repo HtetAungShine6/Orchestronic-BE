@@ -4,7 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { INestApplication } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
-import session from 'express-session';
+import cookieSession from 'cookie-session';
 import { Request, Response } from 'express';
 
 let cachedServer: any;
@@ -20,14 +20,13 @@ async function createApp(): Promise<INestApplication> {
   app.setGlobalPrefix('api');
 
   app.use(
-    session({
-      secret: process.env.SESSION_SECRET || 'supersecret',
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      },
+    cookieSession({
+      name: 'session',
+      keys: [process.env.SESSION_SECRET || 'supersecret'],
+      maxAge: 10 * 60 * 1000, // 10 minutes (only needed during auth flow)
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      httpOnly: true,
     }),
   );
 
