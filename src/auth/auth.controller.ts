@@ -181,7 +181,8 @@ export class AuthController {
       });
 
       console.log('Login successful, redirecting to dashboard');
-      return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+      // return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+      return res.redirect(`${process.env.FRONTEND_URL}/api/auth/callback?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken)}`);
     } catch (err) {
       console.error('Error in Azure callback:', err);
       res.clearCookie('oauth_state', cookieClearOpts);
