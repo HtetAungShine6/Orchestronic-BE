@@ -62,7 +62,7 @@ export class AuthController {
       process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
     const cookieDomain = this.getCookieDomain();
 
-    return {
+    const options: CookieOptions & { partitioned?: boolean } = {
       httpOnly: true,
       secure: isSecureEnv,
       sameSite: isSecureEnv ? 'none' : 'lax',
@@ -70,6 +70,14 @@ export class AuthController {
       maxAge,
       ...(cookieDomain ? { domain: cookieDomain } : {}),
     };
+
+    // FE and BE on different sites (e.g. separate *.vercel.app projects) may
+    // require CHIPS to allow cross-site credentialed requests in modern Chrome.
+    if (isSecureEnv) {
+      options.partitioned = true;
+    }
+
+    return options;
   }
 
   @Get('test-login')
@@ -192,6 +200,7 @@ export class AuthController {
       secure: isSecureEnv,
       sameSite: isSecureEnv ? 'none' : 'lax',
       path: '/',
+      ...(isSecureEnv ? { partitioned: true } : {}),
       ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     res.clearCookie('access_token', {
@@ -199,6 +208,7 @@ export class AuthController {
       secure: isSecureEnv,
       sameSite: isSecureEnv ? 'none' : 'lax',
       path: '/',
+      ...(isSecureEnv ? { partitioned: true } : {}),
       ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     return { message: 'Logged out' };
