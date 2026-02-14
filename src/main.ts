@@ -91,7 +91,6 @@
 //   bootstrap();
 // }
 
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -111,7 +110,7 @@ async function bootstrap() {
       secret: process.env.SESSION_SECRET || 'supersecret',
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: false }, // true if HTTPS
+      cookie: { secure: true }, // true if HTTPS
     }),
   );
 
