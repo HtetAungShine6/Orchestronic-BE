@@ -18,6 +18,20 @@ import { CookieOptions } from 'express';
 export class AuthController {
   constructor(private jwt: JwtService) {}
 
+  private getFrontendRedirectBase(): string {
+    const raw = process.env.FRONTEND_URL || '';
+    const firstOrigin = raw
+      .split(',')
+      .map((value) => value.trim().replace(/^['"]|['"]$/g, ''))
+      .find(Boolean);
+
+    if (!firstOrigin) {
+      throw new Error('FRONTEND_URL is not configured');
+    }
+
+    return firstOrigin.replace(/\/+$/, '');
+  }
+
   private buildCookieOptions(maxAge: number): CookieOptions {
     const isSecureEnv =
       process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
@@ -61,27 +75,27 @@ export class AuthController {
   @Get('azure/callback')
   @UseGuards(AuthGuard('azure-ad'))
   azureCallback(@Req() req, @Res() res: Response) {
-    console.log('Req.user:', req.user);
-    const user = req.user;
+    try {
+      console.log('Req.user:', req.user);
+      const user = req.user;
 
-    // Issue short-lived JWT
-    // Issue short-lived access token
-    const accessToken = this.jwt.sign(user, { expiresIn: '1h' });
+      const accessToken = this.jwt.sign(user, { expiresIn: '1h' });
+      const refreshToken = this.jwt.sign({ id: user.id }, { expiresIn: '7d' });
 
-    // Issue refresh token (store in DB or cache with expiration)
-    const refreshToken = this.jwt.sign({ id: user.id }, { expiresIn: '7d' });
+      res.cookie('access_token', accessToken, {
+        ...this.buildCookieOptions(60 * 60 * 1000),
+      });
 
-    // Save tokens in HTTP-only cookies
-    res.cookie('access_token', accessToken, {
-      ...this.buildCookieOptions(60 * 60 * 1000),
-    });
+      res.cookie('refresh_token', refreshToken, {
+        ...this.buildCookieOptions(7 * 24 * 60 * 60 * 1000),
+      });
 
-    res.cookie('refresh_token', refreshToken, {
-      ...this.buildCookieOptions(7 * 24 * 60 * 60 * 1000),
-    });
-
-    // Redirect to frontend
-    return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+      const redirectBase = this.getFrontendRedirectBase();
+      return res.redirect(302, `${redirectBase}/dashboard`);
+    } catch (error) {
+      console.error('Azure callback failed:', error);
+      return res.status(500).json({ message: 'Azure callback failed' });
+    }
   }
 
   @Post('refresh')
