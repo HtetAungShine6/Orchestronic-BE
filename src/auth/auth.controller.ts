@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
@@ -106,6 +114,31 @@ export class AuthController {
       return res.json({ accessToken });
     } catch {
       return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+  }
+
+  @Get('me')
+  me(@Req() req: RequestWithCookies) {
+    const token = req.cookies?.['access_token'];
+    if (!token) {
+      throw new UnauthorizedException('No access token cookie');
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not defined');
+    }
+
+    try {
+      const decoded = jwt.verify(token, secret) as BackendJwtPayload;
+      return {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role,
+        name: decoded.name,
+      };
+    } catch {
+      throw new UnauthorizedException('Invalid access token');
     }
   }
 
