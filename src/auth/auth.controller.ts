@@ -18,11 +18,15 @@ import { CookieOptions } from 'express';
 export class AuthController {
   constructor(private jwt: JwtService) {}
 
+  private normalizeEnvValue(value: string): string {
+    return value.trim().replace(/^['"]|['"]$/g, '');
+  }
+
   private getFrontendRedirectBase(): string {
     const raw = process.env.FRONTEND_URL || '';
     const firstOrigin = raw
       .split(',')
-      .map((value) => value.trim().replace(/^['"]|['"]$/g, ''))
+      .map((value) => this.normalizeEnvValue(value))
       .find(Boolean);
 
     if (!firstOrigin) {
@@ -32,10 +36,31 @@ export class AuthController {
     return firstOrigin.replace(/\/+$/, '');
   }
 
+  private getCookieDomain(): string | undefined {
+    const raw = process.env.COOKIE_DOMAIN;
+    if (!raw) {
+      return undefined;
+    }
+
+    const normalized = this.normalizeEnvValue(raw);
+    // Domain cookie attribute must be a host only (no scheme/path/port).
+    if (
+      !normalized ||
+      normalized.includes('://') ||
+      normalized.includes('/') ||
+      normalized.includes(':')
+    ) {
+      console.warn(`Ignoring invalid COOKIE_DOMAIN: ${raw}`);
+      return undefined;
+    }
+
+    return normalized;
+  }
+
   private buildCookieOptions(maxAge: number): CookieOptions {
     const isSecureEnv =
       process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-    const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
+    const cookieDomain = this.getCookieDomain();
 
     return {
       httpOnly: true,
@@ -160,7 +185,7 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response) {
     const isSecureEnv =
       process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-    const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
+    const cookieDomain = this.getCookieDomain();
 
     res.clearCookie('refresh_token', {
       httpOnly: true,

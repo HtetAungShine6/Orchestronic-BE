@@ -81,13 +81,17 @@ import session from 'express-session';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const normalizeEnvValue = (value: string) =>
+    value.trim().replace(/^['"]|['"]$/g, '');
+
   const frontendOrigins = (process.env.FRONTEND_URL || '')
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => normalizeEnvValue(origin))
     .filter(Boolean);
   const backendOrigins = (process.env.BACKEND_URL || '')
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => normalizeEnvValue(origin))
     .filter(Boolean);
   const allowedOrigins = new Set([...frontendOrigins, ...backendOrigins]);
 
