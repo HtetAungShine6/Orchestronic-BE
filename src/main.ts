@@ -162,7 +162,8 @@ function configureApp(app: INestApplication) {
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);
 
-  SwaggerModule.setup('api', app, documentFactory, {
+  SwaggerModule.setup('docs', app, documentFactory, {
+    useGlobalPrefix: true,
     customSiteTitle: 'Orchestronic API',
     customfavIcon: 'https://avatars.githubusercontent.com/u/6936373?s=200&v=4',
     customJs: [
