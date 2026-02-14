@@ -4,14 +4,29 @@ import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import * as jwt from 'jsonwebtoken';
+import { CookieOptions } from 'express';
 
 @Controller('auth')
 export class AuthController {
   constructor(private jwt: JwtService) {}
 
+  private buildCookieOptions(maxAge: number): CookieOptions {
+    const isSecureEnv =
+      process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
+
+    return {
+      httpOnly: true,
+      secure: isSecureEnv,
+      sameSite: isSecureEnv ? 'none' : 'lax',
+      path: '/',
+      maxAge,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
+    };
+  }
+
   @Get('test-login')
   testLogin(@Res() res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
     const accessToken = this.jwt.sign(
       { sub: '123', role: 'Admin' },
       { expiresIn: '1h' },
@@ -19,17 +34,11 @@ export class AuthController {
     const refreshToken = this.jwt.sign({ sub: '123' }, { expiresIn: '7d' });
 
     res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: isProd, // for Postman / localhost
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 60 * 60 * 1000,
+      ...this.buildCookieOptions(60 * 60 * 1000),
     });
 
     res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      ...this.buildCookieOptions(7 * 24 * 60 * 60 * 1000),
     });
 
     return res.json({ message: 'Cookies set' });
@@ -44,7 +53,6 @@ export class AuthController {
   @Get('azure/callback')
   @UseGuards(AuthGuard('azure-ad'))
   azureCallback(@Req() req, @Res() res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
     console.log('Req.user:', req.user);
     const user = req.user;
 
@@ -57,17 +65,11 @@ export class AuthController {
 
     // Save tokens in HTTP-only cookies
     res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 60 * 60 * 1000, // 1 hour
+      ...this.buildCookieOptions(60 * 60 * 1000),
     });
 
     res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      ...this.buildCookieOptions(7 * 24 * 60 * 60 * 1000),
     });
 
     // Redirect to frontend
@@ -76,8 +78,6 @@ export class AuthController {
 
   @Post('refresh')
   refresh(@Req() req: RequestWithCookies, @Res() res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
-
     const refreshToken = req.cookies['refresh_token'];
 
     if (!refreshToken) {
@@ -100,10 +100,7 @@ export class AuthController {
       );
 
       res.cookie('access_token', accessToken, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: isProd ? 'none' : 'lax',
-        maxAge: 60 * 60 * 1000, // 1 hour
+        ...this.buildCookieOptions(60 * 60 * 1000),
       });
 
       return res.json({ accessToken });
@@ -114,17 +111,23 @@ export class AuthController {
 
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
+    const isSecureEnv =
+      process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
 
     res.clearCookie('refresh_token', {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      secure: isSecureEnv,
+      sameSite: isSecureEnv ? 'none' : 'lax',
+      path: '/',
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     res.clearCookie('access_token', {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      secure: isSecureEnv,
+      sameSite: isSecureEnv ? 'none' : 'lax',
+      path: '/',
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     return { message: 'Logged out' };
   }

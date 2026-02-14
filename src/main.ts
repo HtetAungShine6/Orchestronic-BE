@@ -81,6 +81,10 @@ import session from 'express-session';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const frontendOrigins = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   app.use(cookieParser());
   app.setGlobalPrefix('api');
@@ -102,7 +106,18 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL, // must be exact origin, no trailing slash
+    origin: (origin, callback) => {
+      // Allow server-to-server calls and direct browser navigations without Origin
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (frontendOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+    },
     credentials: true,
   });
 
