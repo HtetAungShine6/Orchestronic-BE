@@ -35,6 +35,8 @@ import { K8sAutomationModule } from './k8sautomation/k8sautomation.module';
 import { K8sAutomationService } from './k8sautomation/k8sautomation.service';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
 
+const databaseUrl = process.env.DATABASE_URL;
+
 const rabbitMQModules = [
   ClientsModule.register([
     {
@@ -92,21 +94,25 @@ const rabbitMQModules = [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.POSTGRES_HOST,
-      port: parseInt(<string>process.env.POSTGRES_PORT),
-      username: process.env.POSTGRES_USER,
-      password: process.env.POSTGRES_PASSWORD,
-      database: process.env.POSTGRES_DATABASE,
+      ...(databaseUrl
+        ? { url: databaseUrl }
+        : {
+            host: process.env.POSTGRES_HOST,
+            port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+            username: process.env.POSTGRES_USER,
+            password: process.env.POSTGRES_PASSWORD,
+            database: process.env.POSTGRES_DATABASE,
+          }),
       autoLoadEntities: true,
       synchronize: true,
-      // Serverless optimized connection pool settings
+      retryAttempts: 1,
+      retryDelay: 1000,
       extra: {
-        max: 2, // Maximum number of connections in the pool (low for serverless)
+        max: 1,
         connectionTimeoutMillis: 5000,
-        idleTimeoutMillis: 10000,
+        idleTimeoutMillis: 5000,
       },
-      // Disable connection pooling for serverless
-      poolSize: 2,
+      poolSize: 1,
     }),
     ScheduleModule.forRoot(),
     RequestModule,

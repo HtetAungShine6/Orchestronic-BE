@@ -75,12 +75,16 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import { Request, Response } from 'express';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+let cachedHttpHandler:
+  | ((req: Request, res: Response) => void | Promise<void>)
+  | null = null;
+
+function configureApp(app: INestApplication) {
 
   const normalizeEnvValue = (value: string) =>
     value.trim().replace(/^['"]|['"]$/g, '');
@@ -171,8 +175,34 @@ async function bootstrap() {
       'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.css',
     ],
   });
+}
 
+async function getVercelHandler() {
+  if (cachedHttpHandler) {
+    return cachedHttpHandler;
+  }
+
+  const app = await NestFactory.create(AppModule);
+  configureApp(app);
+  await app.init();
+  cachedHttpHandler = app.getHttpAdapter().getInstance();
+  if (!cachedHttpHandler) {
+    throw new Error('Failed to initialize HTTP handler');
+  }
+  return cachedHttpHandler;
+}
+
+export default async function handler(req: Request, res: Response) {
+  const httpHandler = await getVercelHandler();
+  return httpHandler(req, res);
+}
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  configureApp(app);
   await app.listen(process.env.PORT ?? 3001);
 }
 
-bootstrap();
+if (process.env.VERCEL !== '1') {
+  bootstrap();
+}
