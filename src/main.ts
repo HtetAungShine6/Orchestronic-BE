@@ -85,6 +85,11 @@ async function bootstrap() {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const backendOrigins = (process.env.BACKEND_URL || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const allowedOrigins = new Set([...frontendOrigins, ...backendOrigins]);
 
   app.use(cookieParser());
   app.setGlobalPrefix('api');
@@ -112,7 +117,16 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      if (frontendOrigins.includes(origin)) {
+      if (allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+
+      // Keep Swagger and Vercel preview domains usable without constant env edits
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      if (origin.startsWith('http://localhost:')) {
         return callback(null, true);
       }
 
