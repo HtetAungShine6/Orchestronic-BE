@@ -85,17 +85,20 @@ let cachedHttpHandler:
   | null = null;
 
 function configureApp(app: INestApplication) {
-
   const normalizeEnvValue = (value: string) =>
     value.trim().replace(/^['"]|['"]$/g, '');
+  const normalizeOrigin = (value: string) =>
+    normalizeEnvValue(value).replace(/\/+$/, '');
+  const isLocalhostOrigin = (origin: string) =>
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
 
   const frontendOrigins = (process.env.FRONTEND_URL || '')
     .split(',')
-    .map((origin) => normalizeEnvValue(origin))
+    .map((origin) => normalizeOrigin(origin))
     .filter(Boolean);
   const backendOrigins = (process.env.BACKEND_URL || '')
     .split(',')
-    .map((origin) => normalizeEnvValue(origin))
+    .map((origin) => normalizeOrigin(origin))
     .filter(Boolean);
   const allowedOrigins = new Set([...frontendOrigins, ...backendOrigins]);
 
@@ -125,16 +128,18 @@ function configureApp(app: INestApplication) {
         return callback(null, true);
       }
 
-      if (allowedOrigins.has(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (allowedOrigins.has(normalizedOrigin)) {
         return callback(null, true);
       }
 
       // Keep Swagger and Vercel preview domains usable without constant env edits
-      if (origin.endsWith('.vercel.app')) {
+      if (normalizedOrigin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
 
-      if (origin.startsWith('http://localhost:')) {
+      if (isLocalhostOrigin(normalizedOrigin)) {
         return callback(null, true);
       }
 

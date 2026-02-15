@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { BackendJwtPayload, RequestWithCookies } from 'src/lib/types';
 import * as jwt from 'jsonwebtoken';
@@ -57,31 +57,60 @@ export class AuthController {
     return normalized;
   }
 
-  private buildCookieOptions(maxAge: number): CookieOptions {
-    const isSecureEnv =
-      process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+  private getHeaderValue(value: string | string[] | undefined): string {
+    const first = Array.isArray(value) ? value[0] : value;
+    return (first || '').split(',')[0].trim().toLowerCase();
+  }
+
+  private shouldUseSecureCookies(req: Request): boolean {
+    const secureByEnv =
+      process.env.VERCEL === '1' ||
+      process.env.NODE_ENV === 'production' ||
+      process.env.COOKIE_SECURE === 'true';
+
+    if (secureByEnv) {
+      return true;
+    }
+
+    const forwardedProto = this.getHeaderValue(req.headers['x-forwarded-proto']);
+    return req.secure || req.protocol === 'https' || forwardedProto === 'https';
+  }
+
+  private buildBaseCookieOptions(
+    req: Request,
+  ): CookieOptions & { partitioned?: boolean } {
+    const isSecure = this.shouldUseSecureCookies(req);
     const cookieDomain = this.getCookieDomain();
 
     const options: CookieOptions & { partitioned?: boolean } = {
       httpOnly: true,
-      secure: isSecureEnv,
-      sameSite: isSecureEnv ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       path: '/',
-      maxAge,
       ...(cookieDomain ? { domain: cookieDomain } : {}),
     };
 
     // FE and BE on different sites (e.g. separate *.vercel.app projects) may
     // require CHIPS to allow cross-site credentialed requests in modern Chrome.
-    if (isSecureEnv) {
+    if (isSecure) {
       options.partitioned = true;
     }
 
     return options;
   }
 
+  private buildCookieOptions(
+    req: Request,
+    maxAge: number,
+  ): CookieOptions & { partitioned?: boolean } {
+    return {
+      ...this.buildBaseCookieOptions(req),
+      maxAge,
+    };
+  }
+
   @Get('test-login')
-  testLogin(@Res() res: Response) {
+  testLogin(@Req() req: Request, @Res() res: Response) {
     const accessToken = this.jwt.sign(
       { sub: '123', role: 'Admin' },
       { expiresIn: '1h' },
@@ -89,11 +118,11 @@ export class AuthController {
     const refreshToken = this.jwt.sign({ sub: '123' }, { expiresIn: '7d' });
 
     res.cookie('access_token', accessToken, {
-      ...this.buildCookieOptions(60 * 60 * 1000),
+      ...this.buildCookieOptions(req, 60 * 60 * 1000),
     });
 
     res.cookie('refresh_token', refreshToken, {
-      ...this.buildCookieOptions(7 * 24 * 60 * 60 * 1000),
+      ...this.buildCookieOptions(req, 7 * 24 * 60 * 60 * 1000),
     });
 
     return res.json({ message: 'Cookies set' });
@@ -107,7 +136,7 @@ export class AuthController {
 
   @Get('azure/callback')
   @UseGuards(AuthGuard('azure-ad'))
-  azureCallback(@Req() req, @Res() res: Response) {
+  azureCallback(@Req() req: Request & { user?: any }, @Res() res: Response) {
     try {
       console.log('Req.user:', req.user);
       const user = req.user;
@@ -116,11 +145,11 @@ export class AuthController {
       const refreshToken = this.jwt.sign({ id: user.id }, { expiresIn: '7d' });
 
       res.cookie('access_token', accessToken, {
-        ...this.buildCookieOptions(60 * 60 * 1000),
+        ...this.buildCookieOptions(req, 60 * 60 * 1000),
       });
 
       res.cookie('refresh_token', refreshToken, {
-        ...this.buildCookieOptions(7 * 24 * 60 * 60 * 1000),
+        ...this.buildCookieOptions(req, 7 * 24 * 60 * 60 * 1000),
       });
 
       const redirectBase = this.getFrontendRedirectBase();
@@ -155,7 +184,7 @@ export class AuthController {
       );
 
       res.cookie('access_token', accessToken, {
-        ...this.buildCookieOptions(60 * 60 * 1000),
+        ...this.buildCookieOptions(req, 60 * 60 * 1000),
       });
 
       return res.json({ accessToken });
@@ -190,26 +219,12 @@ export class AuthController {
   }
 
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
-    const isSecureEnv =
-      process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-    const cookieDomain = this.getCookieDomain();
-
+  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     res.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: isSecureEnv,
-      sameSite: isSecureEnv ? 'none' : 'lax',
-      path: '/',
-      ...(isSecureEnv ? { partitioned: true } : {}),
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
+      ...this.buildBaseCookieOptions(req),
     });
     res.clearCookie('access_token', {
-      httpOnly: true,
-      secure: isSecureEnv,
-      sameSite: isSecureEnv ? 'none' : 'lax',
-      path: '/',
-      ...(isSecureEnv ? { partitioned: true } : {}),
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
+      ...this.buildBaseCookieOptions(req),
     });
     return { message: 'Logged out' };
   }

@@ -1,3 +1,5 @@
+import { Request as ExpressRequest } from 'express';
+
 export interface BackendJwtPayload {
   id: string;
   email: string;
@@ -31,6 +33,6 @@ export interface CustomJWTPayload {
   appid?: string;
 }
 
-export interface RequestWithCookies extends Request {
+export interface RequestWithCookies extends ExpressRequest {
   cookies: Record<string, string>;
 }
